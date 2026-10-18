@@ -67,15 +67,23 @@ This creates `page.md` (Windows) or `page.json` (Mac/Linux) in the folder your t
 
 **Why you'd want it:** to see where a page leads. For example, a shop's category page links to every product. You can then read each of those pages with Step 2 or Step 5.
 
-**How:** change the first line to your page, then paste both lines.
+**How:** change **only the first line**: put your page's address between the quotes. Then copy the whole block, paste it into the terminal and press Enter. Lines starting with `#` are just notes; the terminal ignores them.
 
 **Windows (PowerShell)**
 ```powershell
-$page = "https://quotes.toscrape.com/"
+$page = "https://quotes.toscrape.com/"   # <-- CHANGE THIS: your page's address, between the quotes
+# Don't change anything below this line
 (Invoke-RestMethod -Method Post -Uri "https://crawler-free.crawler-free.workers.dev/v2/scrape" -ContentType "application/json" -Body (@{ url = $page; formats = @("links") } | ConvertTo-Json)).data.links
 ```
 
-**Mac / Linux:** change the web address inside the quotes after `"url":`.
+**Example.** To get the links on `https://books.toscrape.com/` instead:
+
+```
+Before:  $page = "https://quotes.toscrape.com/"
+After:   $page = "https://books.toscrape.com/"
+```
+
+**Mac / Linux:** change the web address inside the quotes after `"url":`. Leave everything else as it is.
 ```bash
 curl -s -X POST "https://crawler-free.crawler-free.workers.dev/v2/scrape" -H "Content-Type: application/json" -d '{"url": "https://quotes.toscrape.com/", "formats": ["links"]}'
 ```
@@ -96,12 +104,18 @@ https://quotes.toscrape.com/tag/change/page/1/
 
 **What it does:** think of it as handing the crawler a form with empty boxes. You write the box labels, for example *title*, *price* and *availability*. The crawler reads the page and fills in each box. Instead of the whole page, you get just those answers.
 
-**How:** change the first two lines, the page and the box labels, then paste all five lines.
+**How:** change **only the first two lines**:
+
+1. `$page`: the page's address, between the quotes.
+2. `$fields`: the facts you want. Put each one in its own quotes and separate them with commas.
+
+Then copy the whole block, paste it into the terminal and press Enter. Lines starting with `#` are just notes; the terminal ignores them.
 
 **Windows (PowerShell)**
 ```powershell
-$page   = "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html"
-$fields = "title", "price", "availability"
+$page   = "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html"   # <-- CHANGE 1: the page's address
+$fields = "title", "price", "availability"                                               # <-- CHANGE 2: the facts you want
+# Don't change anything below this line
 $props = @{}; foreach ($f in $fields) { $props[$f] = @{ type = "string" } }
 $body = @{ url = $page; formats = @(@{ type = "json"; schema = @{ type = "object"; properties = $props } }) } | ConvertTo-Json -Depth 10
 (Invoke-RestMethod -Method Post -Uri "https://crawler-free.crawler-free.workers.dev/v2/scrape" -ContentType "application/json" -Body $body).data.json
@@ -115,22 +129,42 @@ title        : A Light in the Attic
 availability : In stock (22 available)
 ```
 
-**To use it on something else**, change only the first two lines. For a business's contact page, for example:
+**Example 1: a different book, only its title and price.**
 
-```powershell
-$page   = "https://example-shop.com/contact"
-$fields = "business_name", "address", "opening_hours"
+```
+Before:  $page   = "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html"
+         $fields = "title", "price", "availability"
+
+After:   $page   = "https://books.toscrape.com/catalogue/soumission_998/index.html"
+         $fields = "title", "price"
 ```
 
+**Example 2: a business's contact page.**
+
+```
+After:   $page   = "https://example-shop.com/contact"
+         $fields = "business_name", "address", "opening_hours"
+```
+
+The other three lines stay exactly the same in every case.
+
 Tips:
+
+- Keep the quotation marks: `"title"` is right, `title` is wrong.
 
 - Use simple labels with no spaces: `opening_hours`, not `opening hours`.
 - Only ask for things that are actually written on the page. If a box can't be filled, you'll get `EXTRACT_FAILED`.
 - This step is limited to 20 times per 24 hours per connection, because it uses a shared free AI. See [Free limits](#free-limits).
 
-**Mac / Linux:** change the web address after `"url":`, and the box labels inside `"properties"` (each label is followed by `{"type": "string"}`).
+**Mac / Linux:** change the web address after `"url":`, and the box labels inside `"properties"`. Each label is written as `"label": {"type": "string"}`, with commas between them.
 ```bash
 curl -s -X POST "https://crawler-free.crawler-free.workers.dev/v2/scrape" -H "Content-Type: application/json" -d '{"url": "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html", "formats": [{"type": "json", "schema": {"type": "object", "properties": {"title": {"type": "string"}, "price": {"type": "string"}, "availability": {"type": "string"}}}}]}'
+```
+
+For example, Example 1 above (a different book, title and price only) becomes:
+
+```bash
+curl -s -X POST "https://crawler-free.crawler-free.workers.dev/v2/scrape" -H "Content-Type: application/json" -d '{"url": "https://books.toscrape.com/catalogue/soumission_998/index.html", "formats": [{"type": "json", "schema": {"type": "object", "properties": {"title": {"type": "string"}, "price": {"type": "string"}}}}]}'
 ```
 
 ---
