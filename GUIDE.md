@@ -63,109 +63,68 @@ This creates `page.md` (Windows) or `page.json` (Mac/Linux) in the folder your t
 
 ## Step 4: Get the links on a page
 
-**What it does:** every web page has clickable links to other pages. This step lists all of them as web addresses.
+Get a list of every link on a page, for example to find all the product pages a shop's page points to.
 
-**Why you'd want it:** to see where a page leads. For example, a shop's category page links to every product. You can then read each of those pages with Step 2 or Step 5.
+1. Copy the block below.
+2. Change the line marked `CHANGE` to your page's address.
+3. Paste it into PowerShell and press Enter.
 
-**How:** change **only the first line**: put your page's address between the quotes. Then copy the whole block, paste it into the terminal and press Enter. Lines starting with `#` are just notes; the terminal ignores them.
-
-**Windows (PowerShell)**
 ```powershell
-$page = "https://quotes.toscrape.com/"   # <-- CHANGE THIS: your page's address, between the quotes
+$page = "https://quotes.toscrape.com/"   # <-- CHANGE: the page
 # Don't change anything below this line
 (Invoke-RestMethod -Method Post -Uri "https://crawler-free.crawler-free.workers.dev/v2/scrape" -ContentType "application/json" -Body (@{ url = $page; formats = @("links") } | ConvertTo-Json)).data.links
 ```
 
-**Example.** To get the links on `https://books.toscrape.com/` instead:
-
-```
-Before:  $page = "https://quotes.toscrape.com/"
-After:   $page = "https://books.toscrape.com/"
-```
-
-**Mac / Linux:** change the web address inside the quotes after `"url":`. Leave everything else as it is.
-```bash
-curl -s -X POST "https://crawler-free.crawler-free.workers.dev/v2/scrape" -H "Content-Type: application/json" -d '{"url": "https://quotes.toscrape.com/", "formats": ["links"]}'
-```
-
-**What you get back:** a list of web addresses (49 for this page), starting like this:
+Result:
 
 ```
 https://quotes.toscrape.com/
 https://quotes.toscrape.com/login
 https://quotes.toscrape.com/author/Albert-Einstein
-https://quotes.toscrape.com/tag/change/page/1/
 ...
+```
+
+**Mac / Linux:** change the address after `"url":`.
+```bash
+curl -s -X POST "https://crawler-free.crawler-free.workers.dev/v2/scrape" -H "Content-Type: application/json" -d '{"url": "https://quotes.toscrape.com/", "formats": ["links"]}'
 ```
 
 ---
 
 ## Step 5: Pull out only the facts you want
 
-**What it does:** think of it as handing the crawler a form with empty boxes. You write the box labels, for example *title*, *price* and *availability*. The crawler reads the page and fills in each box. Instead of the whole page, you get just those answers.
+Instead of the whole page, get only the facts you name, for example a book's title and price.
 
-**How:** change **only the first two lines**:
+1. Copy the block below.
+2. Change the two lines marked `CHANGE`: the page's address, and the names of the facts you want.
+3. Paste it into PowerShell and press Enter.
 
-1. `$page`: the page's address, between the quotes.
-2. `$fields`: the facts you want. Put each one in its own quotes and separate them with commas.
-
-Then copy the whole block, paste it into the terminal and press Enter. Lines starting with `#` are just notes; the terminal ignores them.
-
-**Windows (PowerShell)**
 ```powershell
-$page   = "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html"   # <-- CHANGE 1: the page's address
-$fields = "title", "price", "availability"                                               # <-- CHANGE 2: the facts you want
+$page   = "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html"   # <-- CHANGE: the page
+$fields = "title", "price"                                                               # <-- CHANGE: the facts you want
 # Don't change anything below this line
 $props = [ordered]@{}; foreach ($f in $fields) { $props[$f] = @{ type = "string" } }
 $body = @{ url = $page; formats = @(@{ type = "json"; schema = @{ type = "object"; properties = $props } }) } | ConvertTo-Json -Depth 10
 (Invoke-RestMethod -Method Post -Uri "https://crawler-free.crawler-free.workers.dev/v2/scrape" -ContentType "application/json" -Body $body).data.json
 ```
 
-**What you get back:** one line for each label in `$fields`, with the answer the crawler found on the page.
+Result:
 
 ```
-You asked for:  $fields = "title", "price", "availability"
-
-You get back:   title        : A Light in the Attic
-                price        : £51.77
-                availability : In stock (22 available)
+title : A Light in the Attic
+price : £51.77
 ```
-
-**Example: a different book, and only its title and price.** Change the two lines like this:
-
-```
-Before:  $page   = "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html"
-         $fields = "title", "price", "availability"
-
-After:   $page   = "https://books.toscrape.com/catalogue/soumission_998/index.html"
-         $fields = "title", "price"
-```
-
-Run it, and you get back only the two things you asked for, from the new page:
-
-```
-title : Soumission
-price : 50.10
-```
-
-The other three lines stay exactly the same.
 
 Tips:
 
 - Keep the quotation marks: `"title"` is right, `title` is wrong.
-- Use simple labels with no spaces: `opening_hours`, not `opening hours`.
-- Only ask for things that are actually written on the page. If a box can't be filled, you'll get `EXTRACT_FAILED`.
-- This step is limited to 20 times per 24 hours per connection, because it uses a shared free AI. See [Free limits](#free-limits).
+- No spaces in names: use `opening_hours`, not `opening hours`.
+- Only ask for facts that are on the page. Otherwise you'll get `EXTRACT_FAILED`.
+- You can use this step 20 times per 24 hours. See [Free limits](#free-limits).
 
-**Mac / Linux:** change the web address after `"url":`, and the box labels inside `"properties"`. Each label is written as `"label": {"type": "string"}`, with commas between them.
+**Mac / Linux:** change the address after `"url":`, and the names inside `"properties"`. Each name is written as `"name": {"type": "string"}`.
 ```bash
-curl -s -X POST "https://crawler-free.crawler-free.workers.dev/v2/scrape" -H "Content-Type: application/json" -d '{"url": "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html", "formats": [{"type": "json", "schema": {"type": "object", "properties": {"title": {"type": "string"}, "price": {"type": "string"}, "availability": {"type": "string"}}}}]}'
-```
-
-The example above (a different book, title and price only) becomes:
-
-```bash
-curl -s -X POST "https://crawler-free.crawler-free.workers.dev/v2/scrape" -H "Content-Type: application/json" -d '{"url": "https://books.toscrape.com/catalogue/soumission_998/index.html", "formats": [{"type": "json", "schema": {"type": "object", "properties": {"title": {"type": "string"}, "price": {"type": "string"}}}}]}'
+curl -s -X POST "https://crawler-free.crawler-free.workers.dev/v2/scrape" -H "Content-Type: application/json" -d '{"url": "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html", "formats": [{"type": "json", "schema": {"type": "object", "properties": {"title": {"type": "string"}, "price": {"type": "string"}}}}]}'
 ```
 
 ---
