@@ -15,7 +15,8 @@ export interface Env {
 const SILENT = ["origin", "integration"]; // the Firecrawl SDK injects `origin` into every POST
 
 const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
-  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...headers } });
+  // explicit charset: Windows PowerShell 5.1 decodes JSON without one as Latin-1 (“ became â€œ)
+  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", ...headers } });
 
 // json is refused inside crawls: one crawl could drain the shared 10k-neuron daily AI budget.
 function parseFormats(raw: unknown, warn: string[], allowJson = true): Formats {
