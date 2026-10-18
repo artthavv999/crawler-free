@@ -8,6 +8,7 @@ import { clientKey, rateLimit } from "../src/limits";
 import { robotsBody } from "../src/robots";
 import { extract, fitsRow } from "../src/scrape";
 import { claim, discover, type Job } from "../src/crawl";
+import { extractJson } from "../src/json";
 
 it("crawl claim dedupes URLs and stops at the job limit", async () => {
   const db = (env as unknown as Env).DB;
@@ -26,6 +27,16 @@ it("crawl discover keeps in-scope HTML links that robots.txt allows", async () =
   const job: Job = { id: "j2", scope: "https://r.example/", lim: 50, depth: 2, formats: "{}", self: "", created: 0 };
   const links = ["https://r.example/a#x", "https://r.example/private/b", "https://r.example/file.pdf", "https://evil.example/", "https://r.example/index.html"];
   expect(await discover({ DB: db } as unknown as Env, job, links)).toEqual(["https://r.example/a", "https://r.example/"]);
+});
+
+it("json extraction marks every field required and retries once when the model drops one", async () => {
+  const calls: { response_format: { json_schema: { required?: string[] } } }[] = [];
+  const replies = [{ title: "T" }, { title: "T", price: "£1" }];
+  const e = { AI: { run: async (_m: string, input: (typeof calls)[number]) => { calls.push(input); return { response: replies[calls.length - 1] }; } } } as unknown as Env;
+  const schema = { type: "object", properties: { title: { type: "string" }, price: { type: "string" } } };
+  expect(await extractJson(e, "page", { schema })).toEqual({ title: "T", price: "£1" });
+  expect(calls).toHaveLength(2);
+  expect(calls[0].response_format.json_schema.required).toEqual(["title", "price"]);
 });
 
 it("D1 row guard counts UTF-8 bytes, not string length", () => {
