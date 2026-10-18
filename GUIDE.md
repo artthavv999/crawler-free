@@ -126,7 +126,7 @@ Tips:
 
 - Use simple labels with no spaces: `opening_hours`, not `opening hours`.
 - Only ask for things that are actually written on the page. If a box can't be filled, you'll get `EXTRACT_FAILED`.
-- This step is limited to 20 times a day per connection, because it uses a shared free AI.
+- This step is limited to 20 times per 24 hours per connection, because it uses a shared free AI. See [Free limits](#free-limits).
 
 **Mac / Linux:** change the web address after `"url":`, and the box labels inside `"properties"` (each label is followed by `{"type": "string"}`).
 ```bash
