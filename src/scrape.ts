@@ -111,8 +111,11 @@ async function render(env: Env, url: URL): Promise<string> {
     body: JSON.stringify({ url: url.href, userAgent: UA, gotoOptions: { waitUntil: "networkidle0" }, rejectResourceTypes: ["image", "media", "font", "stylesheet"] }),
   });
   if (r.status === 429) throw exhausted();
-  const j = (await r.json().catch(() => ({}))) as { success?: boolean; result?: unknown };
-  if (!j.success || typeof j.result !== "string") throw new ApiError(500, "SCRAPE_FAILED", `browser rendering failed (${r.status})`);
+  const j = (await r.json().catch(() => ({}))) as { success?: boolean; result?: unknown; errors?: { code?: number; message?: string }[] };
+  if (!j.success || typeof j.result !== "string") {
+    const why = j.errors?.map((e) => `${e.code}: ${e.message}`).join("; ").slice(0, 200) ?? "";
+    throw new ApiError(500, "SCRAPE_FAILED", `browser rendering failed (${r.status}${why && ` ${why}`})`);
+  }
   return j.result;
 }
 
