@@ -106,6 +106,8 @@ it("rate limiter returns 429 with Retry-After on call 21; IPv6 is keyed by /64",
   const err = await rateLimit(db, "test", "k", 20, 60).catch((e: ApiError) => e);
   expect(err).toMatchObject({ status: 429, code: "RATE_LIMITED" });
   expect(+(err as ApiError).headers["retry-after"]).toBeGreaterThan(0);
+  const crawlErr = await (async () => { for (let i = 0; i < 6; i++) await rateLimit(db, "crawl", "k2", 5, 86400); })().catch((e: ApiError) => e);
+  expect((crawlErr as ApiError).message).toMatch(/^You've used all 5 whole-website reads allowed per 24 hours\. Try again in about 24 hours\.$/);
   expect(clientKey("2001:db8:1:2:3::9")).toBe("2001:db8:1:2::/64");
   expect(clientKey("2001:DB8:1:2:ffff::1")).toBe(clientKey("2001:db8:1:2::abcd"));
   expect(clientKey("::ffff:1.2.3.4")).not.toBe(clientKey("::ffff:5.6.7.8")); // was one shared bucket

@@ -31,10 +31,7 @@ function asText(data, m) {
 async function call(path, init) {
   const res = await fetch(path, init);
   const body = await res.json().catch(() => ({ success: false, error: `the server answered ${res.status}` }));
-  if (!res.ok || body.success === false) {
-    const wait = res.headers.get("retry-after");
-    throw new Error(`${body.error || `the server answered ${res.status}`}${wait ? ` (try again in ${wait} seconds)` : ""}`);
-  }
+  if (!res.ok || body.success === false) throw new Error(body.error || `The server answered ${res.status}.`);
   return body;
 }
 const post = (path, data) => call(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(data) });

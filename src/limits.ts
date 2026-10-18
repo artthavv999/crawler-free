@@ -10,6 +10,8 @@ export function clientKey(ip: string): string {
   return full.slice(0, 4).map((x) => parseInt(x, 16).toString(16)).join(":") + "::/64";
 }
 
+const LABELS: Record<string, string> = { scrape: "page reads", json: "fact look-ups", crawl: "whole-website reads", setup: "new saved setups" };
+
 // Fixed window that starts at the first request after the previous window ended.
 export async function rateLimit(db: D1Database, name: string, key: string, max: number, windowSec: number): Promise<void> {
   const now = Math.floor(Date.now() / 1000);
@@ -20,6 +22,9 @@ export async function rateLimit(db: D1Database, name: string, key: string, max: 
      RETURNING n, reset`,
   ).bind(`${name}:${key}`, now, windowSec).first<{ n: number; reset: number }>();
   if (row!.n > max) {
-    throw new ApiError(429, "RATE_LIMITED", `${name} is limited to ${max} per ${windowSec}s per client`, { "retry-after": String(row!.reset - now) });
+    const wait = row!.reset - now;
+    const when = wait < 120 ? `${wait} seconds` : wait < 7200 ? `${Math.ceil(wait / 60)} minutes` : `about ${Math.round(wait / 3600)} hours`;
+    const per = windowSec === 60 ? "a minute" : windowSec === 86400 ? "24 hours" : `${windowSec} seconds`;
+    throw new ApiError(429, "RATE_LIMITED", `You've used all ${max} ${LABELS[name] ?? name} allowed per ${per}. Try again in ${when}.`, { "retry-after": String(wait) });
   }
 }
