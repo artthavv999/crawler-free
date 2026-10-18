@@ -2,6 +2,8 @@
 
 A keyless, free-hosted, Firecrawl-v2-compatible API: **URL → clean Markdown**, **whole-site crawl**, and **schema-based JSON extraction**. It runs on one Cloudflare Worker on the Free plan.
 
+**New here? Start with the step-by-step [GUIDE.md](GUIDE.md)**: copy-paste commands for Windows, Mac and Linux.
+
 - **Base URL:** `https://crawler-free.crawler-free.workers.dev`
 - **Source:** https://github.com/artthavv999/crawler-free (MIT, see [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md))
 - **Abuse / opt-out contact:** https://github.com/artthavv999/crawler-free/issues
