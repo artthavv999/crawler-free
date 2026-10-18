@@ -146,7 +146,11 @@ $pages = @($s.data); while ($s.next) { $s = Invoke-RestMethod -Uri $s.next; $pag
 New-Item -ItemType Directory crawl-out -Force | Out-Null; $i = 0; foreach ($p in $pages) { $i++; $p.markdown | Set-Content "crawl-out\page$i.md" -Encoding UTF8 }
 ```
 
-**Mac / Linux:** open the address after `"next"` the same way, adding `?skip=10`, `?skip=20` and so on to the status address.
+**Mac / Linux:** the answer from Step 6b holds the first 10 pages, and near its start a `"next"` address. Put that address in place of `NEXT_ADDRESS`:
+```bash
+curl -s "NEXT_ADDRESS"
+```
+Keep doing the same with the `"next"` address in each new answer until it says `"next":null`. To save each batch, add `-o crawl1.json`, `-o crawl2.json` and so on to the end of the command.
 
 Crawl results are kept for **24 hours**, then deleted.
 
@@ -203,8 +207,10 @@ These are per internet connection:
 | What | Limit |
 |---|---|
 | Reading pages (Steps 2–4) | 20 per minute |
-| Pulling out facts (Step 5) | 20 per day |
-| Crawls (Step 6) | 5 per day, up to 50 pages each |
+| Pulling out facts (Step 5) | 20 per 24 hours |
+| Crawls (Step 6) | 5 per 24 hours, up to 50 pages each |
+
+The 24 hours start with your first request, not at midnight. For example, if your first crawl is at 9:00 and you use all 5, you can crawl again at 9:00 the next day.
 
 Asking for the same page again within an hour is answered instantly from memory.
 

@@ -36,8 +36,8 @@ PowerShell: `Invoke-RestMethod -Method Post -Uri https://crawler-free.crawler-fr
 | What | Limit |
 |---|---|
 | Scrapes | 20 per minute (`429` + `Retry-After`) |
-| JSON extractions | 20 per day; shared free AI budget for everyone (`EXTRACT_BUDGET_EXHAUSTED` when spent) |
-| Crawls | 5 jobs per day; `limit` ≤ 50 pages; `maxDiscoveryDepth` ≤ 3; same host, under the start URL's path |
+| JSON extractions | 20 per 24 h, counted from your first request; shared free AI budget for everyone (`EXTRACT_BUDGET_EXHAUSTED` when spent) |
+| Crawls | 5 jobs per 24 h, counted from your first request; `limit` ≤ 50 pages; `maxDiscoveryDepth` ≤ 3; same host, under the start URL's path |
 | Page size / time | 5 MB, 15 s, at most 5 redirects |
 | JavaScript pages | Rendered by Cloudflare Browser Run only when static HTML is near-empty; small shared daily budget (`RENDER_BUDGET_EXHAUSTED`) |
 | Cache | Results cached 1 h by normalised URL + formats |
