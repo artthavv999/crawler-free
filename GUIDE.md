@@ -7,15 +7,55 @@ Crawler Free reads web pages for you. You send it a web address and it sends bac
 - **specific facts** you ask for, such as a product's name and price, as neat JSON
 - or **a whole website**, page by page (a "crawl")
 
-It's free and needs no account or key. You only need a terminal window.
+It's free and needs no account or key.
+
+---
+
+## The easy way: use the web page
+
+Open **https://crawler-free.crawler-free.workers.dev** in your browser.
+
+1. Paste the web page address into **Web page address**.
+2. Choose what you want: **The page's text**, **All the links**, **Specific facts** (then type the facts, for example `title, price`), or **The whole website** (then choose how many pages).
+3. Press **Go**. The answer appears below, with **Copy** and **Download** buttons.
+
+### Do it again with one click: saved setups
+
+If you'll want the same information from the same page again later, such as a product's price, save it once:
+
+1. Fill in the address and what you want, as above.
+2. Press **Save as a one-click setup**.
+
+It appears under **Your saved setups**. From then on, it's a single step:
+
+- **On the web page:** press **Run** next to it.
+- **From any browser:** open its link (**Copy link**).
+- **From a terminal:** press **Copy terminal command**, paste it into PowerShell and press Enter. It looks like this, and prints the answer straight away:
+
+  ```powershell
+  irm https://crawler-free.crawler-free.workers.dev/run/in5b3rr6wr
+  ```
+
+  On Mac or Linux, use `curl` instead of `irm`.
+
+Good to know:
+
+- If you run a setup again within an hour, you get the saved answer from the last hour; after that it reads the page fresh.
+- A setup is deleted if it isn't run for 30 days. Press **Remove** to delete it sooner.
+- Anyone with a setup's link can run it, so share it only with people you want to.
+- Whole-website reads can't be saved as setups; use **Go** for those.
+
+The rest of this guide shows how to do the same things from a terminal instead.
+
+---
+
+## Using the terminal instead
 
 The service lives at:
 
 ```
 https://crawler-free.crawler-free.workers.dev
 ```
-
----
 
 ## Step 1: Open a terminal
 
@@ -202,7 +242,7 @@ Every error has a `code` that says what happened:
 | `RENDER_BUDGET_EXHAUSTED` | The page needs JavaScript and today's free browser time is used up | Try again after midnight UTC |
 | `EXTRACT_BUDGET_EXHAUSTED` | Today's free AI budget (Step 5) is used up | Try again after midnight UTC |
 | `EXTRACT_FAILED` | The AI couldn't find all the fields you asked for | Use fields that really appear on the page, or add a `prompt` |
-| `NOT_FOUND` | That crawl ID doesn't exist or is older than 24 hours | Start a new crawl |
+| `NOT_FOUND` | That crawl is older than 24 hours, or that saved setup was removed or unused for 30 days | Start a new crawl, or save the setup again |
 | `DISABLED` | The service is switched off for maintenance | Try again later |
 | `SCRAPE_TIMEOUT` / `SCRAPE_FAILED` | The website was too slow, too large (over 5 MB) or not a web page | Check the address, or try later |
 | `BAD_REQUEST` | Something in your command is wrong | Compare it with the examples above |
@@ -219,9 +259,10 @@ These are per internet connection:
 
 | What | Limit |
 |---|---|
-| Reading pages (Steps 2–4) | 20 per minute |
-| Pulling out facts (Step 5) | 20 per 24 hours |
-| Crawls (Step 6) | 5 per 24 hours, up to 50 pages each |
+| Reading pages, including running saved setups | 20 per minute |
+| Pulling out facts (Step 5) | 20 per 24 hours; answers saved from the last hour don't count |
+| Crawls / whole-website reads (Step 6) | 5 per 24 hours, up to 50 pages each |
+| Saving new setups | 20 per 24 hours |
 
 The 24 hours start with your first request, not at midnight. For example, if your first crawl is at 9:00 and you use all 5, you can crawl again at 9:00 the next day.
 

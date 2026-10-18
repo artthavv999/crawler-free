@@ -41,14 +41,16 @@ WHATWG `URL` (normalises `127.1`, `2130706433`, `0x7f000001` → `127.0.0.1`); a
 ## 5. Modules (`src/`, ≤ 800 counted lines; actual after Phase 4)
 | File | Does | Lines |
 |---|---|---|
-| `index.ts` | router (`fetch`, `queue`, `scheduled`), kill switch, limits per route, error envelope, unknown-field warning | 95 |
+| `index.ts` | router (`fetch`, `queue`, `scheduled`), kill switch, limits per route, error envelope, unknown-field warning | 115 |
 | `guard.ts` | URL validation, DoH (60 s memo), IP checks, `safeFetch` (manual redirects, timeout, size cap, UA) | 85 |
 | `robots.ts` | robots fetch/parse/cache, 4xx allow / 5xx disallow, per-isolate memo | 35 |
-| `scrape.ts` | cache (UTF-8 byte guard), block detection, HTMLRewriter strip + regex Markdown, links, metadata, Browser Run fallback | 131 |
-| `json.ts` | Workers AI JSON Mode (`llama-3.2-3b-instruct`) + required-key check | 28 |
+| `scrape.ts` | cache (UTF-8 byte guard), block detection, HTMLRewriter strip + regex Markdown, links, metadata, Browser Run fallback | 133 |
+| `json.ts` | Workers AI JSON Mode (`llama-3.2-3b-instruct`) + required keys, one retry | 34 |
 | `crawl.ts` | create job, sitemap seed, robots/asset link filter, claim/dedupe, crawl-delay slots, queue consumer (row-size guard), status + `next` paging | 92 |
 | `limits.ts` | client key (IPv4 / IPv6 /64), D1 counters, `Retry-After` | 20 |
-| **total** | | **486** |
+| `setups.ts` | saved setups (address + mode + fields), `/run/{id}` plain-text runner, 30-day expiry | 39 |
+| **total** | | **553** |
+Plus `public/` (web page: `index.html`, `app.js`, `style.css`, `_headers` CSP), served as Workers static assets. Added at the user's request after Phase 4 (the brief had excluded UI); it only calls the API above, so every limit and rule still applies.
 Plus `schema.sql` (D1), `wrangler.toml`, `test/units.test.ts` (URL validator, robots, normalisation, rate limiter, extractor, crawl claim).
 JSON model note: the 8B models on the JSON Mode docs page were deprecated on 2026-05-30 (Workers AI error 5028); `llama-3.2-3b-instruct` is the smallest current model that passed the acceptance test.
 

@@ -2,7 +2,7 @@
 
 A keyless, free-hosted, Firecrawl-v2-compatible API: **URL → clean Markdown**, **whole-site crawl**, and **schema-based JSON extraction**. It runs on one Cloudflare Worker on the Free plan.
 
-**New here? Start with the step-by-step [GUIDE.md](GUIDE.md)**: copy-paste commands for Windows, Mac and Linux.
+**Easiest: open https://crawler-free.crawler-free.workers.dev in your browser**, paste a page address, and press Go. You can save a page as a one-click setup and re-run it later with one click, its link, or one terminal command (`irm <link>`). The step-by-step [GUIDE.md](GUIDE.md) covers the web page and copy-paste terminal commands for Windows, Mac and Linux.
 
 - **Base URL:** `https://crawler-free.crawler-free.workers.dev`
 - **Source:** https://github.com/artthavv999/crawler-free (MIT, see [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md))
@@ -17,6 +17,10 @@ No API key, no sign-up. The official Firecrawl JS SDK works unchanged: `new Fire
 | `POST /v2/scrape` | `url`, `formats`: any of `"markdown"`, `"links"`, `{ "type": "json", "schema": {…}, "prompt"?: "…" }` (default `["markdown"]`) | `{ success, data: { markdown?, links?, json?, warning?, metadata } }` + header `x-cache: HIT\|MISS` |
 | `POST /v2/crawl` | `url`, `limit` (default 10), `maxDiscoveryDepth` (default 2, hops from the start page), `scrapeOptions.formats` (markdown/links) | `{ success, id, url }` |
 | `GET /v2/crawl/{id}` | `?skip=N` | `{ success, status: "scraping"\|"completed", completed, total, expiresAt, next, data[] }`, 10 pages per response, follow `next` |
+| `POST /v2/setups` | `url`, `mode`: `"text"`, `"links"` or `"facts"`, `fields` (facts: up to 20 names, array or comma-separated) | `{ success, id, run }`; saves settings only, never page content |
+| `GET /run/{id}` | `?format=json` (optional) | Runs a saved setup: plain text by default (page text, one link per line, or `name: answer` lines), or the `/v2/scrape` JSON |
+| `DELETE /v2/setups/{id}` | — | `{ success }` |
+| `GET /` | — | The web page (static files in `public/`) |
 
 Unknown fields are accepted, ignored and listed in `warning`. Errors are `{ "success": false, "code": "...", "error": "..." }`.
 
@@ -36,12 +40,13 @@ PowerShell: `Invoke-RestMethod -Method Post -Uri https://crawler-free.crawler-fr
 | What | Limit |
 |---|---|
 | Scrapes | 20 per minute (`429` + `Retry-After`) |
-| JSON extractions | 20 per 24 h, counted from your first request; shared free AI budget for everyone (`EXTRACT_BUDGET_EXHAUSTED` when spent) |
+| JSON extractions | 20 per 24 h, counted from your first request; only fresh AI runs count, not cached answers; shared free AI budget for everyone (`EXTRACT_BUDGET_EXHAUSTED` when spent) |
+| Saved setups | 20 new per 24 h; runs count as scrapes; deleted after 30 days without a run |
 | Crawls | 5 jobs per 24 h, counted from your first request; `limit` ≤ 50 pages; `maxDiscoveryDepth` ≤ 3; same host, under the start URL's path |
 | Page size / time | 5 MB, 15 s, at most 5 redirects |
 | JavaScript pages | Rendered by Cloudflare Browser Run only when static HTML is near-empty; small shared daily budget (`RENDER_BUDGET_EXHAUSTED`) |
 | Cache | Results cached 1 h by normalised URL + formats |
-| Retention | Crawl results deleted after 24 h; no permanent archive; Workers logs kept 3 days |
+| Retention | Crawl results deleted after 24 h; saved setups (address + settings only) after 30 days unused; no permanent archive; Workers logs kept 3 days |
 
 ## How it behaves on your site
 
