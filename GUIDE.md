@@ -75,14 +75,7 @@ $page = "https://quotes.toscrape.com/"   # <-- CHANGE: the page
 (Invoke-RestMethod -Method Post -Uri "https://crawler-free.crawler-free.workers.dev/v2/scrape" -ContentType "application/json" -Body (@{ url = $page; formats = @("links") } | ConvertTo-Json)).data.links
 ```
 
-Result:
-
-```
-https://quotes.toscrape.com/
-https://quotes.toscrape.com/login
-https://quotes.toscrape.com/author/Albert-Einstein
-...
-```
+After you press Enter, you'll see a list of web addresses, one per line: all the links on that page.
 
 **Mac / Linux:** change the address after `"url":`.
 ```bash
@@ -108,12 +101,7 @@ $body = @{ url = $page; formats = @(@{ type = "json"; schema = @{ type = "object
 (Invoke-RestMethod -Method Post -Uri "https://crawler-free.crawler-free.workers.dev/v2/scrape" -ContentType "application/json" -Body $body).data.json
 ```
 
-Result:
-
-```
-title : A Light in the Attic
-price : £51.77
-```
+After you press Enter, you'll see each fact you asked for with its answer from the page. Here, the book's title (*A Light in the Attic*) and its price (*£51.77*).
 
 Tips:
 
