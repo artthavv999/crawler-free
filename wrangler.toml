@@ -1,0 +1,32 @@
+name = "crawler-free"
+main = "src/index.ts"
+compatibility_date = "2026-08-15" # newest the vitest pool's workerd supports
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+[vars]
+DISABLED = "0" # kill switch: "1" returns 503 everywhere
+
+[[d1_databases]]
+binding = "DB"
+database_name = "crawler-free"
+database_id = "d6631bd4-c366-4a63-beff-568166174684"
+
+[[queues.producers]]
+binding = "QUEUE"
+queue = "crawler-free"
+
+[[queues.consumers]]
+queue = "crawler-free"
+max_batch_size = 1 # one page per invocation keeps each run inside 50 subrequests / 10 ms CPU
+
+[triggers]
+crons = ["0 * * * *"] # hourly cleanup
+
+[observability]
+enabled = true
+
+# Secrets (npx wrangler secret put): CF_ACCOUNT_ID, CF_BROWSER_TOKEN (Browser Run - Edit)
+
+[ai]
+binding = "AI"
