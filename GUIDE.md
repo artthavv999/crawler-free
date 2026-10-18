@@ -116,20 +116,22 @@ Then copy the whole block, paste it into the terminal and press Enter. Lines sta
 $page   = "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html"   # <-- CHANGE 1: the page's address
 $fields = "title", "price", "availability"                                               # <-- CHANGE 2: the facts you want
 # Don't change anything below this line
-$props = @{}; foreach ($f in $fields) { $props[$f] = @{ type = "string" } }
+$props = [ordered]@{}; foreach ($f in $fields) { $props[$f] = @{ type = "string" } }
 $body = @{ url = $page; formats = @(@{ type = "json"; schema = @{ type = "object"; properties = $props } }) } | ConvertTo-Json -Depth 10
 (Invoke-RestMethod -Method Post -Uri "https://crawler-free.crawler-free.workers.dev/v2/scrape" -ContentType "application/json" -Body $body).data.json
 ```
 
-**What you get back** (the order of the boxes may differ):
+**What you get back:** one line for each label in `$fields`, with the answer the crawler found on the page.
 
 ```
-price        : £51.77
-title        : A Light in the Attic
-availability : In stock (22 available)
+You asked for:  $fields = "title", "price", "availability"
+
+You get back:   title        : A Light in the Attic
+                price        : £51.77
+                availability : In stock (22 available)
 ```
 
-**Example 1: a different book, only its title and price.**
+**Example: a different book, and only its title and price.** Change the two lines like this:
 
 ```
 Before:  $page   = "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html"
@@ -139,19 +141,18 @@ After:   $page   = "https://books.toscrape.com/catalogue/soumission_998/index.ht
          $fields = "title", "price"
 ```
 
-**Example 2: a business's contact page.**
+Run it, and you get back only the two things you asked for, from the new page:
 
 ```
-After:   $page   = "https://example-shop.com/contact"
-         $fields = "business_name", "address", "opening_hours"
+title : Soumission
+price : 50.10
 ```
 
-The other three lines stay exactly the same in every case.
+The other three lines stay exactly the same.
 
 Tips:
 
 - Keep the quotation marks: `"title"` is right, `title` is wrong.
-
 - Use simple labels with no spaces: `opening_hours`, not `opening hours`.
 - Only ask for things that are actually written on the page. If a box can't be filled, you'll get `EXTRACT_FAILED`.
 - This step is limited to 20 times per 24 hours per connection, because it uses a shared free AI. See [Free limits](#free-limits).
@@ -161,7 +162,7 @@ Tips:
 curl -s -X POST "https://crawler-free.crawler-free.workers.dev/v2/scrape" -H "Content-Type: application/json" -d '{"url": "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html", "formats": [{"type": "json", "schema": {"type": "object", "properties": {"title": {"type": "string"}, "price": {"type": "string"}, "availability": {"type": "string"}}}}]}'
 ```
 
-For example, Example 1 above (a different book, title and price only) becomes:
+The example above (a different book, title and price only) becomes:
 
 ```bash
 curl -s -X POST "https://crawler-free.crawler-free.workers.dev/v2/scrape" -H "Content-Type: application/json" -d '{"url": "https://books.toscrape.com/catalogue/soumission_998/index.html", "formats": [{"type": "json", "schema": {"type": "object", "properties": {"title": {"type": "string"}, "price": {"type": "string"}}}}]}'
