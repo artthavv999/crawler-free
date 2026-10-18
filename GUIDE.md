@@ -63,44 +63,75 @@ This creates `page.md` (Windows) or `page.json` (Mac/Linux) in the folder your t
 
 ## Step 4: Get the links on a page
 
-Add `formats` with `"links"`. You can ask for both the text and the links at once.
+**What it does:** every web page has clickable links to other pages. This step lists all of them as web addresses.
+
+**Why you'd want it:** to see where a page leads. For example, a shop's category page links to every product. You can then read each of those pages with Step 2 or Step 5.
+
+**How:** change the first line to your page, then paste both lines.
 
 **Windows (PowerShell)**
 ```powershell
-(Invoke-RestMethod -Method Post -Uri "https://crawler-free.crawler-free.workers.dev/v2/scrape" -ContentType "application/json" -Body (@{ url = "https://quotes.toscrape.com/"; formats = @("markdown", "links") } | ConvertTo-Json)).data.links
+$page = "https://quotes.toscrape.com/"
+(Invoke-RestMethod -Method Post -Uri "https://crawler-free.crawler-free.workers.dev/v2/scrape" -ContentType "application/json" -Body (@{ url = $page; formats = @("links") } | ConvertTo-Json)).data.links
 ```
 
-**Mac / Linux**
+**Mac / Linux:** change the web address inside the quotes after `"url":`.
 ```bash
-curl -s -X POST "https://crawler-free.crawler-free.workers.dev/v2/scrape" -H "Content-Type: application/json" -d '{"url": "https://quotes.toscrape.com/", "formats": ["markdown", "links"]}'
+curl -s -X POST "https://crawler-free.crawler-free.workers.dev/v2/scrape" -H "Content-Type: application/json" -d '{"url": "https://quotes.toscrape.com/", "formats": ["links"]}'
+```
+
+**What you get back:** a list of web addresses (49 for this page), starting like this:
+
+```
+https://quotes.toscrape.com/
+https://quotes.toscrape.com/login
+https://quotes.toscrape.com/author/Albert-Einstein
+https://quotes.toscrape.com/tag/change/page/1/
+...
 ```
 
 ---
 
 ## Step 5: Pull out only the facts you want
 
-Tell Crawler Free which fields you want and an AI fills them in from the page. List each field under `properties`. This example gets a book's title, price and stock status:
+**What it does:** think of it as handing the crawler a form with empty boxes. You write the box labels, for example *title*, *price* and *availability*. The crawler reads the page and fills in each box. Instead of the whole page, you get just those answers.
+
+**How:** change the first two lines, the page and the box labels, then paste all five lines.
 
 **Windows (PowerShell)**
 ```powershell
-$body = @{ url = "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html"; formats = @(@{ type = "json"; schema = @{ type = "object"; properties = @{ title = @{ type = "string" }; price = @{ type = "string" }; availability = @{ type = "string" } } } }) } | ConvertTo-Json -Depth 10
+$page   = "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html"
+$fields = "title", "price", "availability"
+$props = @{}; foreach ($f in $fields) { $props[$f] = @{ type = "string" } }
+$body = @{ url = $page; formats = @(@{ type = "json"; schema = @{ type = "object"; properties = $props } }) } | ConvertTo-Json -Depth 10
 (Invoke-RestMethod -Method Post -Uri "https://crawler-free.crawler-free.workers.dev/v2/scrape" -ContentType "application/json" -Body $body).data.json
 ```
 
-**Mac / Linux**
-```bash
-curl -s -X POST "https://crawler-free.crawler-free.workers.dev/v2/scrape" -H "Content-Type: application/json" -d '{"url": "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html", "formats": [{"type": "json", "schema": {"type": "object", "properties": {"title": {"type": "string"}, "price": {"type": "string"}, "availability": {"type": "string"}}}}]}'
-```
-
-Result (the order of the fields may differ):
+**What you get back** (the order of the boxes may differ):
 
 ```
-title        : A Light in the Attic
 price        : £51.77
+title        : A Light in the Attic
 availability : In stock (22 available)
 ```
 
-**To get different facts**, change the web address and the field names, for example `name`, `opening_hours` and `address` for a shop page. Keep `-Depth 10` in the Windows version: without it, PowerShell silently cuts off the field list. You can also add `prompt = "..."` (Windows) or `"prompt": "..."` (Mac/Linux) next to `schema` to give the AI extra instructions.
+**To use it on something else**, change only the first two lines. For a business's contact page, for example:
+
+```powershell
+$page   = "https://example-shop.com/contact"
+$fields = "business_name", "address", "opening_hours"
+```
+
+Tips:
+
+- Use simple labels with no spaces: `opening_hours`, not `opening hours`.
+- Only ask for things that are actually written on the page. If a box can't be filled, you'll get `EXTRACT_FAILED`.
+- This step is limited to 20 times a day per connection, because it uses a shared free AI.
+
+**Mac / Linux:** change the web address after `"url":`, and the box labels inside `"properties"` (each label is followed by `{"type": "string"}`).
+```bash
+curl -s -X POST "https://crawler-free.crawler-free.workers.dev/v2/scrape" -H "Content-Type: application/json" -d '{"url": "https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html", "formats": [{"type": "json", "schema": {"type": "object", "properties": {"title": {"type": "string"}, "price": {"type": "string"}, "availability": {"type": "string"}}}}]}'
+```
 
 ---
 
