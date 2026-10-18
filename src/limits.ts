@@ -1,8 +1,9 @@
 import { ApiError } from "./guard";
 
-// IPv4 as-is; IPv6 collapsed to its /64 so one host can't rotate through its own prefix.
+// IPv4 as-is; IPv6 collapsed to its /64 so one host can't rotate through its own prefix. IPv4-mapped IPv6
+// ("::ffff:1.2.3.4") stays whole: its /64 would put every such client in one bucket.
 export function clientKey(ip: string): string {
-  if (!ip.includes(":")) return ip;
+  if (!ip.includes(":") || ip.includes(".")) return ip;
   const [head, tail = ""] = ip.toLowerCase().split("::");
   const h = head ? head.split(":") : [], t = tail ? tail.split(":") : [];
   const full = [...h, ...Array(Math.max(0, 8 - h.length - t.length)).fill("0"), ...t];

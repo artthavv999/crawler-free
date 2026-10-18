@@ -21,7 +21,7 @@ export async function robotsFor(db: D1Database, u: URL, selfHost: string) {
   if (body === null) {
     try {
       const { res, body: text } = await safeFetch(robotsUrl, selfHost);
-      body = robotsBody(res.status, text);
+      body = robotsBody(res.status, text).slice(0, 500_000); // RFC 9309 minimum to parse; keeps the D1 row < 2 MB
     } catch (e) {
       if (e instanceof ApiError && e.code === "URL_BLOCKED") throw e;
       body = DISALLOW_ALL;

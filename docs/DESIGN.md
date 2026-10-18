@@ -22,7 +22,7 @@ Reference clones: `_ref/firecrawl` @ acd9d41 (2026-10-17), `_ref/Scrapling` @ 7a
 | robots-parser (MIT) | RFC 9309 matching, `Crawl-delay` | — |
 
 ## 3. Architecture (deltas from the brief's default are marked ⚑)
-- **Scrape**: validate URL → robots (per origin, D1-cached 1 h; fetch failures cached 5 min) → `fetch` `redirect:"manual"`, re-validate + robots-check every hop (≤5) → 401/402/403/challenge ⇒ `BLOCKED` → HTMLRewriter removes page-chrome tags/roles/class-or-id tokens and hidden elements (no content scoring, like Firecrawl) → regex HTML→Markdown → links from the whole page, made absolute, http(s) only, deduped → metadata.
+- **Scrape**: validate URL → robots (per origin, D1-cached 1 h; fetch failures cached 5 min) → `fetch` `redirect:"manual"`, re-validate + robots-check every hop (≤5) → 401/402/403/challenge ⇒ `BLOCKED` → HTMLRewriter removes page-chrome tags/roles, class/id tokens that start with a chrome word (`sidebar-left`, not `has-sidebar`), page-level `<header>/<footer>/<aside>` (kept inside article/section/main, per HTML landmark rules) and hidden elements (no content scoring, like Firecrawl) → regex HTML→Markdown → links from the whole page, made absolute, http(s) only, deduped → metadata.
 - **JS fallback** ⚑: if the page is 2xx, the extracted word count is `< 10` and the HTML has `<script>` (measured: `/js/` = 1 word, example.com = 25 words and now ships a script), call Browser Run **`/content`** (rendered HTML) instead of `/markdown`, then run the same pipeline. Reason: Quick Actions are limited to 1 request / 10 s *in total*; `/markdown` + `/links` would be two calls and two output styles. Upstream 429 / missing token ⇒ `RENDER_BUDGET_EXHAUSTED`. We pass our honest UA as `userAgent`.
 - **Evidence for the trigger** (0e): `quotes.toscrape.com/` raw HTML has 10 `div.quote`, 0 `<script>`; `/js/` raw HTML has 0 `div.quote` — its quote text exists only inside a `<script>` data array, and REA's rendered capture shows 10 `div.quote` after JS. So `/js/` needs rendering, `/` does not, and "text present in raw HTML" is the wrong signal.
 - **URL key** (dedupe + cache): WHATWG-normalised, `#hash` dropped, query params sorted, trailing `/index.html|/index.php` → `/`. Crawl scope: same hostname and path under the seed's directory.
@@ -41,14 +41,14 @@ WHATWG `URL` (normalises `127.1`, `2130706433`, `0x7f000001` → `127.0.0.1`); a
 ## 5. Modules (`src/`, ≤ 800 counted lines; actual after Phase 4)
 | File | Does | Lines |
 |---|---|---|
-| `index.ts` | router (`fetch`, `queue`, `scheduled`), kill switch, limits per route, error envelope, unknown-field warning | 94 |
+| `index.ts` | router (`fetch`, `queue`, `scheduled`), kill switch, limits per route, error envelope, unknown-field warning | 95 |
 | `guard.ts` | URL validation, DoH (60 s memo), IP checks, `safeFetch` (manual redirects, timeout, size cap, UA) | 85 |
 | `robots.ts` | robots fetch/parse/cache, 4xx allow / 5xx disallow, per-isolate memo | 35 |
-| `scrape.ts` | cache, block detection, HTMLRewriter strip + regex Markdown, links, metadata, Browser Run fallback | 124 |
+| `scrape.ts` | cache (UTF-8 byte guard), block detection, HTMLRewriter strip + regex Markdown, links, metadata, Browser Run fallback | 131 |
 | `json.ts` | Workers AI JSON Mode (`llama-3.2-3b-instruct`) + required-key check | 28 |
-| `crawl.ts` | create job, sitemap seed, claim/dedupe, crawl-delay slots, queue consumer, status + `next` paging | 82 |
+| `crawl.ts` | create job, sitemap seed, robots/asset link filter, claim/dedupe, crawl-delay slots, queue consumer (row-size guard), status + `next` paging | 92 |
 | `limits.ts` | client key (IPv4 / IPv6 /64), D1 counters, `Retry-After` | 20 |
-| **total** | | **468** |
+| **total** | | **486** |
 Plus `schema.sql` (D1), `wrangler.toml`, `test/units.test.ts` (URL validator, robots, normalisation, rate limiter, extractor, crawl claim).
 JSON model note: the 8B models on the JSON Mode docs page were deprecated on 2026-05-30 (Workers AI error 5028); `llama-3.2-3b-instruct` is the smallest current model that passed the acceptance test.
 

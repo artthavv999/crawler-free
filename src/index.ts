@@ -28,6 +28,7 @@ function parseFormats(raw: unknown, warn: string[], allowJson = true): Formats {
     else if (type === "json" && allowJson) {
       const { schema, prompt } = x as { schema?: unknown; prompt?: unknown };
       if (!schema || typeof schema !== "object" || Array.isArray(schema)) throw new ApiError(400, "BAD_REQUEST", "json format needs a JSON Schema object in schema");
+      if (JSON.stringify(schema).length > 10_000) throw new ApiError(400, "BAD_REQUEST", "json schema is larger than 10,000 characters"); // AI budget is shared
       f.json = { schema: schema as Record<string, unknown>, ...(typeof prompt === "string" && { prompt: prompt.slice(0, 2000) }) };
     }
     else warn.push(`format ${JSON.stringify(type)} is not supported`);

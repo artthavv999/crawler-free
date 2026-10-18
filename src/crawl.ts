@@ -1,6 +1,6 @@
 import { ApiError, checkUrl, normUrl, safeFetch, UA } from "./guard";
 import { assertAllowed, robotsFor } from "./robots";
-import { scrape, type Formats } from "./scrape";
+import { fitsRow, scrape, type Formats } from "./scrape";
 import type { Env } from "./index";
 
 export type CrawlMsg = { job: string; url: string; depth: number };
@@ -8,7 +8,7 @@ export type Job = { id: string; scope: string; lim: number; depth: number; forma
 
 const DAY = 86400;
 const PAGE_SIZE = 10;
-const MAX_MARKDOWN = 200_000; // per stored page; D1 rows max 2 MB
+const MAX_MARKDOWN = 200_000; // chars per stored page; fitsRow() is the hard 2 MB guard
 
 // One statement (D1 allows 50 queries and 100 bound params per invocation): keeps only URLs this job hasn't seen,
 // up to the job's page limit. Depth is discovery hops from the seed, as in Firecrawl.
@@ -46,8 +46,16 @@ async function sitemap(env: Env, seed: URL, self: string): Promise<string[]> {
   }
 }
 
-const inScope = (job: Job, links: string[]) =>
-  links.flatMap((l) => { try { const n = normUrl(l); return n.startsWith(job.scope) && !/\.xml(\.gz)?$/.test(n) ? [n] : []; } catch { return []; } });
+const ASSET = /\.(xml|gz|zip|pdf|jpe?g|png|gif|webp|svg|ico|css|js|json|mp[34]|webm|woff2?|ttf|exe|dmg)$/i;
+
+// Links worth a page slot: in scope, not a file asset, and allowed by robots.txt. Filtering before claim() keeps
+// disallowed or non-HTML URLs from using up the job's page limit.
+export async function discover(env: Env, job: Job, links: string[]): Promise<string[]> {
+  const robot = await robotsFor(env.DB, new URL(job.scope), job.self);
+  return links.flatMap((l) => {
+    try { const u = new URL(normUrl(l)); return u.href.startsWith(job.scope) && !ASSET.test(u.pathname) && robot.isAllowed(u.href, UA) ? [u.href] : []; } catch { return []; }
+  });
+}
 
 export async function startCrawl(env: Env, rawUrl: string, lim: number, depth: number, f: Formats, self: string, origin: string) {
   const seed = checkUrl(rawUrl, self);
@@ -56,7 +64,7 @@ export async function startCrawl(env: Env, rawUrl: string, lim: number, depth: n
     formats: JSON.stringify(f), self, created: Math.floor(Date.now() / 1000) };
   await env.DB.prepare("INSERT INTO jobs (id, scope, lim, depth, formats, self, created) VALUES (?, ?, ?, ?, ?, ?, ?)")
     .bind(job.id, job.scope, lim, depth, job.formats, self, job.created).run();
-  await enqueue(env, job, await claim(env, job, [normUrl(seed), ...inScope(job, await sitemap(env, seed, self))], 0), 0);
+  await enqueue(env, job, await claim(env, job, [normUrl(seed), ...(await discover(env, job, await sitemap(env, seed, self)))], 0), 0);
   return { success: true, id: job.id, url: `${origin}/v2/crawl/${job.id}` };
 }
 
@@ -71,13 +79,18 @@ export async function crawlPage(env: Env, msg: CrawlMsg): Promise<void> {
   let status = "done", data: unknown, found: string[] = [];
   try {
     const { doc } = await scrape(env, msg.url, { ...f, links: true }, job.self);
-    found = inScope(job, doc.links ?? []);
+    found = await discover(env, job, doc.links ?? []);
     data = { ...doc, links: f.links ? doc.links : undefined, markdown: doc.markdown?.slice(0, MAX_MARKDOWN) };
   } catch (e) {
     status = "failed";
     data = e instanceof ApiError ? { code: e.code, error: e.message } : { code: "UNKNOWN_ERROR", error: "internal error" };
   }
-  await env.DB.prepare("UPDATE pages SET status = ?, data = ? WHERE job = ? AND url = ?").bind(status, JSON.stringify(data), job.id, msg.url).run();
+  let row = JSON.stringify(data);
+  if (!fitsRow(row)) { // an oversized row would make this UPDATE throw forever and leave the job stuck at "scraping"
+    status = "failed";
+    row = JSON.stringify({ code: "SCRAPE_FAILED", error: "page result too large to store" });
+  }
+  await env.DB.prepare("UPDATE pages SET status = ?, data = ? WHERE job = ? AND url = ?").bind(status, row, job.id, msg.url).run();
   if (msg.depth < job.depth) await enqueue(env, job, await claim(env, job, found, msg.depth + 1), msg.depth + 1);
 }
 

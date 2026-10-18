@@ -7,6 +7,8 @@ export type Formats = { markdown?: boolean; links?: boolean; json?: JsonFormat }
 export type Doc = { markdown?: string; links?: string[]; warning?: string; metadata: Record<string, unknown> };
 
 const CACHE_TTL = 3600;
+// D1 rows max out at 2 MB of UTF-8; String.length counts UTF-16 units, so CJK text can be 3x larger in bytes.
+export const fitsRow = (s: string) => new TextEncoder().encode(s).length < 1_900_000;
 const RENDER_BELOW_WORDS = 10; // quotes.toscrape.com/js/ extracts 0 words statically, example.com 25
 
 // Page chrome and hidden content are dropped natively by HTMLRewriter (Firecrawl-style selector categories, no scoring);
@@ -15,14 +17,19 @@ const RENDER_BELOW_WORDS = 10; // quotes.toscrape.com/js/ extracts 0 words stati
 // per-text JS callbacks cross the JS/native boundary and dominated CPU on Workers Free (10 ms limit).
 const STRUCTURAL = new Set(["html", "body", "main", "article"]); // Wikipedia's <body> class list contains "main-menu-…"
 const DROP = [
-  "head title script style noscript template svg math iframe canvas object select button nav header footer aside dialog".split(" "),
+  "head title script style noscript template svg math iframe canvas object select button nav dialog".split(" "),
   "[hidden]", '[aria-hidden="true" i]',
   "navigation banner contentinfo complementary dialog alertdialog menu menubar search".split(" ").map((r) => `[role="${r}" i]`),
 ].flat().join(",");
-const CHROME_WORDS = "nav menu sidebar header footer breadcrumb cookie consent share social popup modal overlay newsletter advert banner skip jump editsection".split(" ");
+// <header>/<footer>/<aside> are page chrome only at page level (HTML landmark rules). Inside these they hold content:
+// post titles, bylines, notes (WordPress puts every post title in <main><section>…<header class="entry-header">).
+const IN_CONTENT = "article header,article footer,article aside,section header,section footer,section aside,main header,main footer";
+const CHROME_WORDS = "nav menu dropdown sidebar header footer breadcrumb cookie consent share social popup modal overlay newsletter advert banner skip jump editsection".split(" ");
 const CHROME_SEL = CHROME_WORDS.flatMap((w) => [`[class*="${w}" i]`, `[id*="${w}" i]`]).join(",");
-// Confirms a CHROME_SEL substring hit is a whole class/id token ("site-header", "nav-links"), not "canvas" or "shared".
-const CHROME = /(^|[\s_-])(nav|navbar|navigation|menu|sidebar|header|footer|breadcrumbs?|cookies?|consent|share|sharing|social|popup|modal|overlay|newsletter|advert|banner|skip|jump|editsection)([\s_-]|$)/i;
+// Confirms a CHROME_SEL substring hit is chrome: a token that starts with a chrome word ("sidebar-left", "nav-links"),
+// ends with an unambiguous one ("main-nav", "dropdown-menu", "mw-editsection"), or is "site-header"/"site-footer".
+// Not "has-sidebar", "entry-header", "card-footer", "canvas" or "shared": those wrap or hold real content.
+const CHROME = /(^|\s)(nav|navbar|navigation|menu|dropdown|sidebar|header|footer|breadcrumbs?|cookies?|consent|share|sharing|social|popup|modal|overlay|newsletter|advert|banner|skip|jump)([-_\s]|$)|[-_](nav|navbar|navigation|menu|dropdown|breadcrumbs?|editsection|jump-link|skip-link)(\s|$)|(^|\s)(site|global)-(header|footer)(\s|$)/i;
 const HIDDEN_STYLE = /display\s*:\s*none|visibility\s*:\s*hidden|opacity\s*:\s*0(?![.\d])|font-size\s*:\s*0(?![.\d])/i;
 const TAG = /<(?:"[^"]*"|'[^']*'|[^'">])*>/g; // allows ">" inside quoted attribute values
 const HREF = /\shref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i; // leading \s skips data-href
@@ -51,7 +58,7 @@ const attr = (tag: string, re: RegExp) => { const m = tag.match(re); return m ? 
 // limit bound it to that one request; switch to streaming conversion if 1102 errors appear in logs.
 export async function extract(html: string, url: URL) {
   const meta: Record<string, string> = {};
-  let title = "", base = url;
+  let title = "", base = url, inContent = false;
   const cleaned = await new HTMLRewriter()
     .on("base[href]", { element: (el) => { try { base = new URL(decode(el.getAttribute("href")!), url); } catch { /* keep page URL */ } } })
     .on("html", { element: (el) => { meta.language = el.getAttribute("lang") ?? ""; } })
@@ -61,6 +68,9 @@ export async function extract(html: string, url: URL) {
       if (k === "description" || k.startsWith("og:")) meta[k === "description" ? k : ogKey(k)] ??= v;
     } })
     .on(DROP, { element: (el) => { el.remove(); } })
+    // Both handlers fire for the same element in this order: the first flags in-content ones, the second consumes it.
+    .on(IN_CONTENT, { element: () => { inContent = true; } })
+    .on("header,footer,aside", { element: (el) => { if (!inContent) el.remove(); inContent = false; } })
     .on(CHROME_SEL, { element: (el) => {
       if (!STRUCTURAL.has(el.tagName) && CHROME.test(`${el.getAttribute("class") ?? ""} ${el.getAttribute("id") ?? ""}`)) el.remove();
     } })
@@ -68,7 +78,7 @@ export async function extract(html: string, url: URL) {
     .transform(new Response(html))
     .text();
 
-  const abs = (h: string) => { try { return h && !h.startsWith("#") ? new URL(h.trim(), base).href : ""; } catch { return ""; } };
+  const abs = (h: string) => { h = h.trim(); try { return h && !h.startsWith("#") ? new URL(h, base).href : ""; } catch { return ""; } };
   const links = new Set<string>(); // from the whole page, including nav and hidden parts
   for (const [t] of html.matchAll(/<a\s(?:"[^"]*"|'[^']*'|[^'">])*>/gi)) { const h = abs(attr(t, HREF)); if (/^https?:/.test(h)) links.add(h); }
 
@@ -143,8 +153,8 @@ export async function scrape(env: Env, rawUrl: string, f: Formats, selfHost: str
     metadata: { ...page.metadata, sourceURL: rawUrl, url: url.href, statusCode: res.status, proxyUsed: "basic" },
   };
   const json = JSON.stringify(doc);
-  if (json.length < 1_000_000) { // D1 rows max 2 MB
-    await env.DB.prepare("INSERT OR REPLACE INTO cache (k, body, expires) VALUES (?, ?, ?)").bind(key, json, now + CACHE_TTL).run();
+  if (fitsRow(json)) { // best effort: a cache write must never fail a scrape that already succeeded
+    await env.DB.prepare("INSERT OR REPLACE INTO cache (k, body, expires) VALUES (?, ?, ?)").bind(key, json, now + CACHE_TTL).run().catch((e) => console.error(e));
   }
   return { doc, hit: false };
 }
