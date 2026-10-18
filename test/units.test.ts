@@ -9,6 +9,22 @@ import { robotsBody } from "../src/robots";
 import { extract, fitsRow } from "../src/scrape";
 import { claim, discover, type Job } from "../src/crawl";
 import { extractJson } from "../src/json";
+import { asText, createSetup } from "../src/setups";
+
+it("saved setups validate input, clean field names and print plain text", async () => {
+  const db = (env as unknown as Env).DB;
+  await db.exec(schema);
+  const e = { DB: db } as unknown as Env;
+  const s = await createSetup(e, { url: "https://books.toscrape.com/", mode: "facts", fields: "title, unit price" }, "self.example", "https://self.example");
+  expect(s.run).toMatch(/^https:\/\/self\.example\/run\/[a-z0-9]{10}$/);
+  expect(s.fields).toEqual(["title", "unit_price"]);
+  expect(await db.prepare("SELECT mode, fields FROM setups WHERE id = ?").bind(s.id).first()).toEqual({ mode: "facts", fields: '["title","unit_price"]' });
+  await expect(createSetup(e, { url: "http://127.0.0.1/" }, "", "")).rejects.toMatchObject({ code: "URL_BLOCKED" });
+  await expect(createSetup(e, { url: "https://a.example/", mode: "facts" }, "", "")).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  await expect(createSetup(e, { url: "https://a.example/", mode: "everything" }, "", "")).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  expect(asText({ json: { title: "T", price: "£1" }, metadata: {} } as never, "facts")).toBe("title: T\nprice: £1");
+  expect(asText({ links: ["https://a.example/", "https://b.example/"], metadata: {} }, "links")).toBe("https://a.example/\nhttps://b.example/");
+});
 
 it("crawl claim dedupes URLs and stops at the job limit", async () => {
   const db = (env as unknown as Env).DB;

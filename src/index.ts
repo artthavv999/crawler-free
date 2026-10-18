@@ -2,6 +2,7 @@ import { crawlPage, crawlStatus, startCrawl, type CrawlMsg } from "./crawl";
 import { ApiError } from "./guard";
 import { clientKey, rateLimit } from "./limits";
 import { scrape, type Formats } from "./scrape";
+import { asText, createSetup, loadSetup, runSetup, SETUP_TTL } from "./setups";
 
 export interface Env {
   DB: D1Database;
@@ -65,8 +66,7 @@ export default {
         const warn: string[] = [];
         const body = await readBody(req, ["url", "formats"], warn);
         const f = parseFormats(body.formats, warn);
-        if (f.json) await rateLimit(env.DB, "json", client, 20, 86400);
-        const { doc, hit } = await scrape(env, body.url, f, host);
+        const { doc, hit } = await scrape(env, body.url, f, host, client);
         if (warn.length) doc.warning = warn.join("; ");
         return json(200, { success: true, data: doc }, { "x-cache": hit ? "HIT" : "MISS" });
       }
@@ -82,6 +82,25 @@ export default {
         const lim = clamp(body.limit, 10, 1, 50, "limit", warn), depth = clamp(body.maxDiscoveryDepth, 2, 0, 3, "maxDiscoveryDepth", warn);
         const started = await startCrawl(env, body.url, lim, depth, parseFormats(so.formats, warn, false), host, origin);
         return json(200, { ...started, ...(warn.length && { warning: warn.join("; ") }) });
+      }
+      if (req.method === "POST" && pathname === "/v2/setups") {
+        await rateLimit(env.DB, "setup", client, 20, 86400);
+        const warn: string[] = [];
+        const body = await readBody(req, ["url", "mode", "fields"], warn);
+        return json(200, { ...(await createSetup(env, body, host, origin)), ...(warn.length && { warning: warn.join("; ") }) });
+      }
+      const [, kind, sid] = pathname.match(/^\/(run|v2\/setups)\/([a-z0-9]{10})$/) ?? [];
+      if (sid && kind === "v2/setups" && req.method === "DELETE") {
+        await env.DB.prepare("DELETE FROM setups WHERE id = ?").bind(sid).run();
+        return json(200, { success: true });
+      }
+      if (sid && kind === "run" && req.method === "GET") { // one-step re-run of a saved setup; same limits as a scrape
+        await rateLimit(env.DB, "scrape", client, 20, 60);
+        const s = await loadSetup(env, sid);
+        const { doc, hit } = await runSetup(env, s, host, client);
+        const headers = { "x-cache": hit ? "HIT" : "MISS" };
+        if (searchParams.get("format") === "json") return json(200, { success: true, data: doc }, headers);
+        return new Response(asText(doc, s.mode), { headers: { "content-type": "text/plain; charset=utf-8", ...headers } });
       }
       const id = pathname.startsWith("/v2/crawl/") ? pathname.slice(10) : "";
       // shortcut: status polls are not rate limited (the SDK polls every 2 s); Workers' 100k requests/day is the cap.
@@ -106,6 +125,7 @@ export default {
       ...["counters WHERE reset", "cache WHERE expires", "robots WHERE expires"].map((t) => env.DB.prepare(`DELETE FROM ${t} < ?`).bind(now)),
       env.DB.prepare("DELETE FROM pages WHERE job IN (SELECT id FROM jobs WHERE created < ?)").bind(now - 86400),
       env.DB.prepare("DELETE FROM jobs WHERE created < ?").bind(now - 86400),
+      env.DB.prepare("DELETE FROM setups WHERE last_run < ?").bind(now - SETUP_TTL),
     ]);
   },
 } satisfies ExportedHandler<Env, CrawlMsg>;

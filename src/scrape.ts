@@ -1,5 +1,6 @@
 import { ApiError, checkUrl, normUrl, safeFetch, UA } from "./guard";
 import { extractJson, type JsonFormat } from "./json";
+import { rateLimit } from "./limits";
 import { assertAllowed } from "./robots";
 import type { Env } from "./index";
 
@@ -129,13 +130,15 @@ async function render(env: Env, url: URL): Promise<string> {
   return j.result;
 }
 
-export async function scrape(env: Env, rawUrl: string, f: Formats, selfHost: string): Promise<{ doc: Doc; hit: boolean }> {
+// `client` is the caller's rate-limit key: the AI limit is charged only on a cache miss, when the model really runs.
+export async function scrape(env: Env, rawUrl: string, f: Formats, selfHost: string, client = ""): Promise<{ doc: Doc; hit: boolean }> {
   const norm = normUrl(checkUrl(rawUrl, selfHost));
   const key = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify([norm, f]))))]
     .map((b) => b.toString(16).padStart(2, "0")).join("");
   const now = Math.floor(Date.now() / 1000);
   const cached = await env.DB.prepare("SELECT body FROM cache WHERE k = ? AND expires > ?").bind(key, now).first<string>("body");
   if (cached) return { doc: JSON.parse(cached), hit: true };
+  if (f.json) await rateLimit(env.DB, "json", client, 20, 86400);
 
   const { res, url, body } = await safeFetch(rawUrl, selfHost, (u) => assertAllowed(env.DB, u, selfHost));
   if ([401, 402, 403, 429].includes(res.status) || res.headers.get("cf-mitigated") === "challenge") {

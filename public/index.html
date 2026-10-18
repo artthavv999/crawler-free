@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Crawler Free</title>
+  <meta name="description" content="Free web page reader: get a page's text, its links, specific facts, or a whole website. No sign-up.">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <main>
+    <h1>Crawler Free</h1>
+    <p class="lead">Paste a web page address, choose what you want, and press <strong>Go</strong>.</p>
+
+    <form id="form" novalidate>
+      <label for="url">Web page address</label>
+      <input id="url" type="url" inputmode="url" autocomplete="url" placeholder="https://books.toscrape.com/">
+
+      <fieldset>
+        <legend>What do you want?</legend>
+        <label class="choice"><input type="radio" name="mode" value="text" checked> The page's text</label>
+        <label class="choice"><input type="radio" name="mode" value="links"> All the links</label>
+        <label class="choice"><input type="radio" name="mode" value="facts"> Specific facts</label>
+        <label class="choice"><input type="radio" name="mode" value="site"> The whole website</label>
+      </fieldset>
+
+      <div id="facts-box" hidden>
+        <label for="fields">Facts you want, separated by commas</label>
+        <input id="fields" placeholder="title, price">
+      </div>
+
+      <div id="site-box" hidden>
+        <label for="limit">How many pages (1 to 50)</label>
+        <input id="limit" type="number" min="1" max="50" value="10">
+      </div>
+
+      <div class="actions">
+        <button type="submit" id="go">Go</button>
+        <button type="button" id="save" class="secondary">Save as a one-click setup</button>
+      </div>
+    </form>
+
+    <p id="status" role="status" aria-live="polite"></p>
+
+    <section id="result" hidden>
+      <div class="bar">
+        <h2>Result</h2>
+        <div>
+          <button type="button" id="copy" class="secondary">Copy</button>
+          <button type="button" id="download" class="secondary">Download</button>
+        </div>
+      </div>
+      <pre id="out"></pre>
+    </section>
+
+    <section id="saved" hidden>
+      <h2>Your saved setups</h2>
+      <p class="hint">Run one with a single click, open its link in any browser, or paste its command into a terminal.</p>
+      <ul id="setups"></ul>
+    </section>
+
+    <footer>
+      <p>Crawler Free follows each site's robots.txt and never gets around bot protection.
+        Limits per connection: 20 pages a minute, 20 fact look-ups and 5 whole-website reads per 24 hours.</p>
+      <p><a href="https://github.com/artthavv999/crawler-free/blob/main/GUIDE.md">Guide</a> ·
+        <a href="https://github.com/artthavv999/crawler-free">Source code</a> ·
+        <a href="https://github.com/artthavv999/crawler-free/issues">Report a problem</a></p>
+    </footer>
+  </main>
+</body>
+</html>

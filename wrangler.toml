@@ -4,6 +4,9 @@ compatibility_date = "2026-08-15" # newest the vitest pool's workerd supports
 compatibility_flags = ["nodejs_compat"]
 workers_dev = true
 
+[assets]
+directory = "./public" # the web page; served by Cloudflare directly, API paths fall through to the Worker
+
 [vars]
 DISABLED = "0" # kill switch: "1" returns 503 everywhere
 
