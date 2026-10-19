@@ -17,7 +17,7 @@ No API key, no sign-up. The official Firecrawl JS SDK works unchanged: `new Fire
 |---|---|---|
 | `POST /v2/scrape` | `url`, `formats`: any of `"markdown"`, `"links"`, `{ "type": "json", "schema": {…}, "prompt"?: "…" }` (default `["markdown"]`) | `{ success, data: { markdown?, links?, json?, warning?, metadata } }` + header `x-cache: HIT\|MISS` |
 | `POST /v2/crawl` | `url`, `limit` (default 10), `maxDiscoveryDepth` (default 2, hops from the start page), `scrapeOptions.formats` (markdown/links) | `{ success, id, url }` |
-| `GET /v2/crawl/{id}` | `?skip=N` | `{ success, status: "scraping"\|"completed", completed, total, expiresAt, next, data[] }`, 10 pages per response, follow `next` |
+| `GET /v2/crawl/{id}` | `?skip=N` | `{ success, status: "scraping"\|"completed", completed, total, failed, expiresAt, next, data[], failures? }`, 10 pages per response, follow `next`. Two additions to Firecrawl's shape: `failed` counts pages that couldn't be read (`total` doesn't include them), and once the crawl is completed the first response (`skip=0`) lists them as `failures: [{ url, code, error }]` (up to 100) |
 | `POST /v2/setups` | `url`, `mode`: `"text"`, `"links"` or `"facts"`, `fields` (facts: up to 20 names, array or comma-separated) | `{ success, id, run }`; saves settings only, never page content |
 | `GET /run/{id}` | `?format=json` (optional) | Runs a saved setup: plain text by default (page text, one link per line, or `name: answer` lines), or the `/v2/scrape` JSON |
 | `DELETE /v2/setups/{id}` | — | `{ success }` |

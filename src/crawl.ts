@@ -110,21 +110,40 @@ export async function crawlPage(env: Env, msg: CrawlMsg, retryLater?: () => void
   if (msg.depth < job.depth) await enqueue(env, job, await claim(env, job, found, msg.depth + 1), msg.depth + 1);
 }
 
+export type Failure = { url: string; code: string; error: string };
+
+// Firecrawl-shaped status, plus two additive fields so callers can report partial failures honestly:
+// `failed` (pages that couldn't be read; `total` keeps counting only the others) on every response, and
+// `failures` ({ url, code, error } for each) once the crawl has finished, on the first results page (skip=0) only,
+// so following `next` doesn't re-read them.
 export async function crawlStatus(env: Env, id: string, skip: number, origin: string) {
   const job = await env.DB.prepare("SELECT created FROM jobs WHERE id = ?").bind(id).first<{ created: number }>();
   if (!job) throw new ApiError(404, "NOT_FOUND", "crawl job not found (jobs expire after 24 h)");
-  const c = await env.DB.prepare("SELECT SUM(status = 'done') AS done, SUM(status != 'failed') AS total, SUM(status = 'queued') AS queued FROM pages WHERE job = ?")
-    .bind(id).first<{ done: number | null; total: number | null; queued: number | null }>();
+  const c = await env.DB.prepare("SELECT SUM(status = 'done') AS done, SUM(status != 'failed') AS total, SUM(status = 'queued') AS queued, SUM(status = 'failed') AS failed FROM pages WHERE job = ?")
+    .bind(id).first<{ done: number | null; total: number | null; queued: number | null; failed: number | null }>();
   const { results } = await env.DB.prepare("SELECT data FROM pages WHERE job = ? AND status = 'done' ORDER BY rowid LIMIT ? OFFSET ?")
     .bind(id, PAGE_SIZE + 1, skip).all<{ data: string }>();
+  const finished = !c?.queued;
+  let failures: Failure[] | undefined;
+  if (finished && skip === 0 && c?.failed) {
+    const { results: rows } = await env.DB.prepare("SELECT url, data FROM pages WHERE job = ? AND status = 'failed' ORDER BY rowid LIMIT 100")
+      .bind(id).all<{ url: string; data: string | null }>();
+    failures = rows.map((r) => {
+      let d: { code?: unknown; error?: unknown } = {};
+      try { d = JSON.parse(r.data ?? "{}"); } catch { /* keep the defaults */ }
+      return { url: r.url, code: typeof d.code === "string" ? d.code : "SCRAPE_FAILED", error: typeof d.error === "string" ? d.error : "" };
+    });
+  }
   return {
     success: true,
-    status: c?.queued ? "scraping" : "completed",
+    status: finished ? "completed" : "scraping",
     completed: c?.done ?? 0,
     total: c?.total ?? 0,
+    failed: c?.failed ?? 0,
     creditsUsed: 0,
     expiresAt: new Date((job.created + DAY) * 1000).toISOString(),
     next: results.length > PAGE_SIZE ? `${origin}/v2/crawl/${id}?skip=${skip + PAGE_SIZE}` : null,
     data: results.slice(0, PAGE_SIZE).map((r) => JSON.parse(r.data)),
+    ...(failures && { failures }),
   };
 }

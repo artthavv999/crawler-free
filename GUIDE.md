@@ -189,6 +189,8 @@ do { Start-Sleep 3; $s = Invoke-RestMethod -Uri $job.url; "$($s.completed)/$($s.
 curl -s "https://crawler-free.crawler-free.workers.dev/v2/crawl/JOB_ID"
 ```
 
+Pages that couldn't be read (for example a page behind a login) aren't in the results. The answer counts them in `"failed"`, and once the crawl is completed it lists each one, with the reason, under `"failures"`.
+
 ### 6c. Collect and save the pages
 
 Results come 10 pages at a time. Each answer has a `next` address for the next 10, until `next` is empty.
