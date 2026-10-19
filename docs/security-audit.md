@@ -37,7 +37,7 @@ brief). Protection relies on per-connection rate limits, the SSRF guard and robo
 | F7 | **Medium** (corrected from Low after the second review) | Status polls and deletes aren't rate limited | `src/index.ts`: `GET /v2/crawl/{id}` (commented as a shortcut) and `DELETE`. One poll reads up to about 200 D1 rows (the job's page counts plus the page data), so one client polling a finished 100-page job every 2 s would use up D1's 5M free reads a day in about 13 hours, and then every request fails. My first rating called this "a cheap D1 call", which was wrong. | Fixed: polls 60/min and 2,000/day per connection, `skip` capped at 100; deletes 30/min |
 | F8 | Low (potential) | DNS rebinding window in the SSRF guard | `src/guard.ts:47` (acknowledged in code): the DoH check and `fetch()` resolve separately. Workers' outbound network should not reach private ranges, which limits the impact; **this was not verified here**. Redirect hops are re-checked. | Documented |
 | F16 | Low | Some IPv6 special-purpose blocks passed the SSRF address check | `src/guard.ts` `isPublicIp` allowed all of 2000::/3 except four hand-picked prefixes, so 3fff::/20 (documentation) and the rest of 2001::/23 (IETF protocol assignments, including 2001:2::/48 benchmarking) counted as public, against IANA's special-purpose registry. These addresses aren't routed on the internet, so the impact is small. Found by the second review. | Fixed: explicit block table, 128-bit matching, malformed addresses rejected |
-| F9 | Low (potential) | JavaScript-rendered pages can navigate without re-checks | `src/scrape.ts` `render()` checks only the starting URL. In Cloudflare's browser, script redirects and subresources aren't re-checked against robots.txt or the SSRF guard. The browser runs on Cloudflare's network, not this app's. **Not verified**. | Documented |
+| F9 | Low | JavaScript-rendered pages can make sub-requests without re-checks | `src/scrape.ts` `render()` checks only the starting URL. In Cloudflare's browser, script fetches, frames and redirects aren't re-checked against robots.txt or the SSRF guard. **Confirmed live on 2026-10-19:** a rendered test page's `fetch()` to the IP literal `https://1.1.1.1/` completed. | Fixed for IP literals, `localhost`, local suffixes and single-label hosts (`rejectRequestPattern`). Verified live: the same fetch is now blocked, an ordinary hostname still loads, and a JS-only site still renders. Names that resolve to private addresses can't be caught by a URL pattern. |
 | F10 | Low | Vulnerable packages in the dev toolchain only | `npm audit`: 5 high (sharp, undici via miniflare in wrangler and @cloudflare/vitest-pool-workers). Runtime dependencies: **0**. These packages aren't deployed, and npm's suggested "fix" is a downgrade. | Tracked by Dependabot |
 | F11 | Info | Prompt injection into fact extraction | `src/json.ts`: untrusted page text goes to the model. Existing mitigations: hidden text stripped, the system prompt says to ignore page instructions, JSON schema output, no tools, no secrets, and results go only to the requester. A page can influence only the facts reported about itself. | Accepted |
 | F12 | Info | O(n²) regex passes on pathological HTML | `src/scrape.ts:58-59` (acknowledged in code). Bounded by the 5 MB cap and the CPU limit; only that one request fails. | Accepted |
@@ -82,8 +82,8 @@ Every GitHub Action is pinned to a full commit SHA, and each container image to 
 | Check | Command | Result |
 |---|---|---|
 | Typecheck | `npx tsc --noEmit` | **Passed** |
-| Tests (with Cloudflare login) | `npx vitest run` | **Passed**: 31/31 (11 existing, 9 security, 11 limits) |
-| Tests (no credentials, as CI runs them) | `CRAWLER_WRANGLER_CONFIG=./wrangler.ci.toml npx vitest run` with an empty Wrangler config dir | **Passed**: 31/31 |
+| Tests (with Cloudflare login) | `npx vitest run` | **Passed**: 32/32 (11 existing, 10 security, 11 limits) |
+| Tests (no credentials, as CI runs them) | `CRAWLER_WRANGLER_CONFIG=./wrangler.ci.toml npx vitest run` with an empty Wrangler config dir | **Passed**: 32/32 |
 | Secrets, git history | Gitleaks v8.30.1 (`gitleaks git`, container pinned by digest) | **Passed**: 17 commits, no leaks |
 | Secrets, working tree | Gitleaks `dir` | 33 findings, **all in `_ref/`** (git-ignored third-party clones, placeholder keys in their `.env.example` files); now allow-listed. 0 in this project's files. |
 | Secrets, files changed after that run | Pattern scan (keyword plus token, private keys, GitHub/AWS keys, 32-hex IDs) over 45 new or changed files | **Passed**: 0 matches |
@@ -94,7 +94,9 @@ Every GitHub Action is pinned to a full commit SHA, and each container image to 
 | Workflow files | Local lint: no tabs, even indentation, every `uses:` pinned to a SHA, every image to a digest | **Passed**; full schema validation happens on GitHub at the first push |
 | CodeQL, Dependabot, dependency review | — | **Not run** (they run on GitHub after the push) |
 | Gitleaks re-run after the last doc edits | — | **Not run**: Docker stopped. The pattern scan above covered those files. |
-| Production | — | **Not scanned** (by design). The security changes are **not deployed yet** |
+| Production checks after deploy (2026-10-19) | curl and headless Chrome, harmless requests only | **Passed**: API responses carry the security headers; the static page has COOP/COEP/CORP/Permissions-Policy/X-Frame-Options/HSTS; a cross-site POST gets 403 `CROSS_SITE_BLOCKED`; a 70 KB body gets 413; an SDK-style read works; a page read through the UI works with zero console errors and `crossOriginIsolated` |
+| Browser Run sub-request test (live) | A rendered test page (served by httpbin.org) `fetch()`es `https://1.1.1.1/` | Before: **completed**. With `rejectRequestPattern`: **blocked** (`TypeError`). Controls: an ordinary hostname still loads; quotes.toscrape.com/js/ still renders (287 words) |
+| Production | — | **Not scanned** with any scanner (by design) |
 
 ## F2: what was implemented (approved 2026-10-19)
 
@@ -121,7 +123,7 @@ That report was a static read of the public repository; it ran no code and no sc
 
 | Their finding | Verdict | What was done |
 |---|---|---|
-| 1. SSRF: DNS rebinding and browser rendering | **Valid design risk, not demonstrated** (same as F8 and F9) | DNS rebinding: Workers can't pin a resolved IP to `fetch()`, so the gap can't be closed in code; every redirect hop is still re-checked. Browser rendering: Browser Run accepts `rejectRequestPattern`, but Cloudflare's docs give an ambiguous pattern format (`'/^.*.(css)'`) and it can't be tested without the production token. A wrong pattern would silently block nothing, so it is **left for a live test after deploy**. Rendering can be switched off with no code change: `npx wrangler secret delete CF_BROWSER_TOKEN`. |
+| 1. SSRF: DNS rebinding and browser rendering | **Valid design risk, not demonstrated** (same as F8 and F9) | DNS rebinding: Workers can't pin a resolved IP to `fetch()`, so the gap can't be closed in code; every redirect hop is still re-checked. Browser rendering: **tested live and fixed** (F9). Plain regex source works in `rejectRequestPattern`; Cloudflare's docs had left the format unclear. Rendering can also be switched off with no code change: `npx wrangler secret delete CF_BROWSER_TOKEN`. |
 | 2. Body size limit before JSON parsing | **Already fixed** (F3) | 64 KB, checked from `content-length` and while streaming; 413; tests for declared, streamed (no `content-length`) and malformed bodies. The "5 MB" in the docs is the fetched-page cap, not the request body limit. |
 | 3. Crawl-status polling not rate limited | **Valid; fixed now** (F7, re-rated Medium) | 60/min and 2,000/day per connection; `skip` capped at 100; tests. |
 | 4. Keyless access and shared-resource abuse | **Fixed earlier** (F2) | Per-connection, per-network and shared daily caps; refused requests write nothing. |
@@ -135,21 +137,21 @@ That report was a static read of the public repository; it ran no code and no sc
 
 1. **F2, raw request floods:** a custom domain with a rate-limiting rule, or Workers Paid; see above. The rest of F2 is fixed.
 2. **F5: a delete key for saved setups.** Return a separate secret at creation, store only its hash in a new `setups` column, and require it on DELETE; existing setups would stay deletable by ID until they expire. This is a schema change.
-3. **F9, limiting Browser Run's sub-requests:** after a deploy, test whether `rejectRequestPattern` actually blocks requests to IP literals, `localhost` and single-label hosts, then keep it if it does. Or switch JavaScript rendering off (`npx wrangler secret delete CF_BROWSER_TOKEN`) until that is done; pages that need JavaScript would then return `RENDER_BUDGET_EXHAUSTED`.
-4. **GitHub repository settings** (I can't change these from here, and they need your OK in any case):
+3. **GitHub repository settings** (I can't change these from here, and they need your OK in any case):
    - Settings → Code security: turn on **Private vulnerability reporting** (SECURITY.md points to it), **Dependabot alerts**, **Dependabot security updates**, and **Secret scanning** with **Push protection**.
    - Code scanning results appear after the first CodeQL run.
 
 ## Deploying and rolling back
 
-Production currently runs the redesigned page (version `494728e6-fffe-47dc-9319-7e9257dff71d`) **without** these security changes.
+Deployed on 2026-10-19: commits 381d6fe…11c09ad as version `13030e64-44ec-4257-88cc-42cef90a140b`, then the Browser Run patterns as version `9b3eaef2-36ac-495e-b3aa-3361daabf16f`.
 
-Deploy (after review): `npx wrangler deploy`. Then check:
+To deploy again: `npx wrangler deploy`. Then check:
 - `curl -sI https://crawler-free.crawler-free.workers.dev/v2/x` shows `x-content-type-options: nosniff`.
 - A cross-site POST is refused: `curl -s -X POST https://crawler-free.crawler-free.workers.dev/v2/setups -H "Sec-Fetch-Site: cross-site" -d "{}"` returns `CROSS_SITE_BLOCKED`.
 - The page still reads a URL.
 
 Roll back the Worker and static files together:
+- To everything except the Browser Run patterns: `npx wrangler rollback 13030e64-44ec-4257-88cc-42cef90a140b`.
 - To the redesign without the security changes: `npx wrangler rollback 494728e6-fffe-47dc-9319-7e9257dff71d`.
 - To the page before the redesign: `npx wrangler rollback eda6afa7-002b-455e-a6e9-054356c918a6`.
 - Or `git revert` the commit and deploy again.

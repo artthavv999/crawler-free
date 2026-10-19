@@ -112,6 +112,17 @@ export async function extract(html: string, url: URL) {
   return { markdown: clean(md), links: [...links], words: md.match(/\S+/g)?.length ?? 0, metadata };
 }
 
+// Sub-requests the browser makes for a rendered page (scripts, fetches, frames) don't go through safeFetch's checks.
+// Refuse targets that are never ordinary public sites: IP literals, localhost and local suffixes, single-label hosts.
+// Names that resolve to private addresses can't be caught here (the browser runs on Cloudflare's network, not ours).
+// Verified live on 2026-10-19 with an IP-literal fetch from a rendered page (docs/security-audit.md, F9).
+export const RENDER_BLOCK = [
+  String.raw`^[a-z][a-z0-9+.-]*://([^/?#@]*@)?\d{1,3}(\.\d{1,3}){3}(:\d+)?([/?#]|$)`,
+  String.raw`^[a-z][a-z0-9+.-]*://([^/?#@]*@)?\[`,
+  String.raw`^[a-z][a-z0-9+.-]*://([^/?#@]*@)?([^/?#:@]*\.)?(localhost|local|internal|lan|home\.arpa)\.?(:\d+)?([/?#]|$)`,
+  String.raw`^[a-z][a-z0-9+.-]*://([^/?#@]*@)?[^/?#:@.]+\.?(:\d+)?([/?#]|$)`,
+];
+
 // Browser Run /content: rendered HTML for JS shells, fed through the same pipeline. Free plan: 1 request / 10 s, 10 min/day.
 async function render(env: Env, url: URL): Promise<string> {
   const exhausted = () => new ApiError(503, "RENDER_BUDGET_EXHAUSTED", "page needs JavaScript rendering, which is unavailable or out of free daily budget; retry later");
@@ -119,7 +130,7 @@ async function render(env: Env, url: URL): Promise<string> {
   const r = await fetch(`https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/browser-run/content`, {
     method: "POST",
     headers: { authorization: `Bearer ${env.CF_BROWSER_TOKEN}`, "content-type": "application/json" },
-    body: JSON.stringify({ url: url.href, userAgent: UA, gotoOptions: { waitUntil: "networkidle0" }, rejectResourceTypes: ["image", "media", "font", "stylesheet"] }),
+    body: JSON.stringify({ url: url.href, userAgent: UA, gotoOptions: { waitUntil: "networkidle0" }, rejectResourceTypes: ["image", "media", "font", "stylesheet"], rejectRequestPattern: RENDER_BLOCK }),
   });
   if (r.status === 429) { // either today's 10 browser-minutes are spent, or the 1-request-per-10-s rate was hit
     if (/today/i.test(await r.text().catch(() => ""))) throw exhausted();

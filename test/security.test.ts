@@ -6,6 +6,7 @@ import type { Env } from "../src/index";
 import { discover, type Job } from "../src/crawl";
 import { ApiError, checkUrl, isPublicIp, readCapped } from "../src/guard";
 import { extractJson } from "../src/json";
+import { RENDER_BLOCK } from "../src/scrape";
 
 // Regression tests for the HTTP-level defences in src/index.ts. They go through the real Worker (SELF) and never
 // reach the network: every request here is refused, or handled with D1 alone.
@@ -111,4 +112,16 @@ it("keeps crawls inside their starting folder on the same origin", async () => {
     "https://s.example/docs/../admin", "https://s.example/docs/%2e%2e/admin", "https://s.example/", "http://s.example/docs/c",
     "https://s.example.evil.example/docs/d", "https://evil.example/docs/e", "https://user@s.example/docs/f", "https://s.example/docs/report.pdf"];
   expect(await discover(env as unknown as Env, job, links)).toEqual(["https://s.example/docs/a", "https://s.example/docs/b?x=1"]);
+});
+
+it("tells the rendering browser to refuse sub-requests to IP literals, local names and single-label hosts", () => {
+  const blocks = (u: string) => RENDER_BLOCK.some((p) => new RegExp(p).test(u));
+  const refused = ["https://1.1.1.1/cdn-cgi/trace", "http://127.0.0.1:8080/", "http://169.254.169.254/latest/meta-data/", "http://[::1]/",
+    "https://user@10.0.0.1/", "http://localhost/", "http://localhost.:3000/x", "http://printer.local/a", "http://db.internal/",
+    "http://router.home.arpa/", "http://metadata/computeMetadata/v1/", "ws://localhost:9222/devtools"];
+  for (const u of refused) expect(blocks(u), u).toBe(true);
+  const allowed = ["https://example.com/", "https://cdn.example.com/app.js?v=1", "https://fonts.gstatic.com/s/a.woff2", "https://1example.com/",
+    "https://example.com/127.0.0.1", "https://localhost.example.com/", "https://example.local.com/", "data:text/plain,hi",
+    "blob:https://example.com/0d3c", "about:blank", "https://xn--bcher-kva.example/"];
+  for (const u of allowed) expect(blocks(u), u).toBe(false);
 });
