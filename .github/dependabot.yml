@@ -1,12 +1,15 @@
 # Weekly update pull requests for npm packages and for the pinned GitHub Actions. Security-fix pull requests also need
 # "Dependabot security updates" switched on in the repository settings (Settings > Code security).
 # After merging an update to gsap, lenis, ogl or esbuild, run `npm run build:ui` and commit public/ (CI checks this).
+# Releases are only proposed after 14 days, the same rule the pinned versions were chosen by.
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 14
     open-pull-requests-limit: 5
     groups:
       dev-tooling:
@@ -16,3 +19,9 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 14
+    groups:
+      # one pull request for all actions: CodeQL's init and analyze must always move together
+      actions:
+        patterns: ["*"]
