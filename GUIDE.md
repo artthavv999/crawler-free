@@ -159,7 +159,7 @@ curl -s -X POST "https://crawler-free.crawler-free.workers.dev/v2/scrape" -H "Co
 
 ## Step 6: Read a whole website (crawl)
 
-A crawl starts at one page, follows its links, and reads up to 50 pages of the same site. It runs in the background and takes from a few seconds to a few minutes.
+A crawl starts at one page, follows its links and the site's sitemap, and reads up to 100 pages of the same site. It runs in the background and takes from a few seconds to a few minutes.
 
 ### 6a. Start the crawl
 
@@ -173,7 +173,7 @@ $job = Invoke-RestMethod -Method Post -Uri "https://crawler-free.crawler-free.wo
 curl -s -X POST "https://crawler-free.crawler-free.workers.dev/v2/crawl" -H "Content-Type: application/json" -d '{"url": "https://books.toscrape.com/", "limit": 20}'
 ```
 
-- `limit` is how many pages to read, up to 50 (default 10).
+- `limit` is how many pages to read, up to 100 (default 10).
 - You can add `maxDiscoveryDepth` (0–3, default 2): how many clicks away from the start page to go.
 - The crawl stays on the same website, inside the start page's folder.
 
@@ -239,6 +239,7 @@ Every error has a `code` that says what happened:
 | `ROBOTS_DISALLOWED` | The website asks bots not to read that page | Nothing; Crawler Free respects that |
 | `BLOCKED` | The website refused or put up a bot check | Nothing; Crawler Free never tries to get around blocks |
 | `URL_BLOCKED` | The address is private, local, or not `http`/`https` | Use a normal public web address |
+| `RENDER_BUSY` | The page needs JavaScript and the free browser is busy (it reads one such page every 10 seconds) | Try again in a few seconds. Crawls retry these pages by themselves |
 | `RENDER_BUDGET_EXHAUSTED` | The page needs JavaScript and today's free browser time is used up | Try again after midnight UTC |
 | `EXTRACT_BUDGET_EXHAUSTED` | Today's free AI budget (Step 5) is used up | Try again after midnight UTC |
 | `EXTRACT_FAILED` | The AI couldn't find all the fields you asked for | Use fields that really appear on the page, or add a `prompt` |
@@ -261,7 +262,7 @@ These are per internet connection:
 |---|---|
 | Reading pages, including running saved setups | 20 per minute |
 | Pulling out facts (Step 5) | 20 per 24 hours; answers saved from the last hour don't count |
-| Crawls / whole-website reads (Step 6) | 5 per 24 hours, up to 50 pages each |
+| Crawls / whole-website reads (Step 6) | 5 per 24 hours, up to 100 pages each |
 | Saving new setups | 20 per 24 hours |
 
 The 24 hours start with your first request, not at midnight. For example, if your first crawl is at 9:00 and you use all 5, you can crawl again at 9:00 the next day.

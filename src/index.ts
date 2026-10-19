@@ -79,7 +79,7 @@ export default {
         const so = (body.scrapeOptions ?? {}) as Record<string, unknown>;
         const extra = Object.keys(so).filter((k) => k !== "formats");
         if (extra.length) warn.push(`ignored unsupported scrapeOptions: ${extra.join(", ")}`);
-        const lim = clamp(body.limit, 10, 1, 50, "limit", warn), depth = clamp(body.maxDiscoveryDepth, 2, 0, 3, "maxDiscoveryDepth", warn);
+        const lim = clamp(body.limit, 10, 1, 100, "limit", warn), depth = clamp(body.maxDiscoveryDepth, 2, 0, 3, "maxDiscoveryDepth", warn);
         const started = await startCrawl(env, body.url, lim, depth, parseFormats(so.formats, warn, false), host, origin);
         return json(200, { ...started, ...(warn.length && { warning: warn.join("; ") }) });
       }
@@ -116,7 +116,8 @@ export default {
 
   async queue(batch, env) {
     if (env.DISABLED === "1") return; // kill switch also stops queued crawl fetches (messages are dropped)
-    for (const m of batch.messages) await crawlPage(env, m.body);
+    // A busy browser is retried 15-30 s later (jittered so busy pages don't collide again), up to 5 attempts.
+    for (const m of batch.messages) await crawlPage(env, m.body, m.attempts < 5 ? () => m.retry({ delaySeconds: 15 + Math.floor(Math.random() * 16) }) : undefined);
   },
 
   async scheduled(_ctl, env) {

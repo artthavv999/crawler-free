@@ -121,7 +121,10 @@ async function render(env: Env, url: URL): Promise<string> {
     headers: { authorization: `Bearer ${env.CF_BROWSER_TOKEN}`, "content-type": "application/json" },
     body: JSON.stringify({ url: url.href, userAgent: UA, gotoOptions: { waitUntil: "networkidle0" }, rejectResourceTypes: ["image", "media", "font", "stylesheet"] }),
   });
-  if (r.status === 429) throw exhausted();
+  if (r.status === 429) { // either today's 10 browser-minutes are spent, or the 1-request-per-10-s rate was hit
+    if (/today/i.test(await r.text().catch(() => ""))) throw exhausted();
+    throw new ApiError(503, "RENDER_BUSY", "page needs JavaScript rendering and the shared free browser is busy (one page every 10 seconds); try again in a few seconds", { "retry-after": "10" });
+  }
   const j = (await r.json().catch(() => ({}))) as { success?: boolean; result?: unknown; errors?: { code?: number; message?: string }[] };
   if (!j.success || typeof j.result !== "string") {
     const why = j.errors?.map((e) => `${e.code}: ${e.message}`).join("; ").slice(0, 200) ?? "";

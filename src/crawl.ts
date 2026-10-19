@@ -33,17 +33,24 @@ async function enqueue(env: Env, job: Job, urls: string[], depth: number): Promi
   await env.QUEUE.sendBatch(urls.map((url, i) => ({ body: { job: job.id, url, depth }, delaySeconds: Math.min(start - now + i * delay, 43200) })));
 }
 
-// shortcut: only the first sitemap (robots `Sitemap:` or /sitemap.xml), no sitemap-index recursion; recurse when
-// crawls of sitemap-index sites come back short.
+// Every <loc> in a sitemap (page URLs, or child sitemaps in a sitemap index). <image:loc> is not matched.
+export const sitemapLocs = (xml: string) =>
+  [...xml.matchAll(/<loc>\s*([^<]+?)\s*<\/loc>/g)].flatMap(([, u]) => { try { return [normUrl(u.replace(/&amp;/g, "&"))]; } catch { return []; } });
+
+// The site's first sitemap (robots `Sitemap:` or /sitemap.xml). If it is an index (WordPress/Yoast lists one sitemap
+// per content type), its child sitemaps are read too: up to 10, one level deep, to stay within 50 subrequests.
 async function sitemap(env: Env, seed: URL, self: string): Promise<string[]> {
-  const loc = (await robotsFor(env.DB, seed, self)).getSitemaps()[0] ?? `${seed.origin}/sitemap.xml`;
-  try {
-    const { res, body } = await safeFetch(loc, self, (u) => assertAllowed(env.DB, u, self));
-    if (!res.ok) return [];
-    return [...body.matchAll(/<loc>\s*([^<]+?)\s*<\/loc>/g)].flatMap(([, u]) => { try { return [normUrl(u.replace(/&amp;/g, "&"))]; } catch { return []; } });
-  } catch {
-    return [];
-  }
+  const read = async (loc: string) => {
+    try {
+      const { res, body } = await safeFetch(loc, self, (u) => assertAllowed(env.DB, u, self));
+      return res.ok ? sitemapLocs(body) : [];
+    } catch {
+      return [];
+    }
+  };
+  const top = await read((await robotsFor(env.DB, seed, self)).getSitemaps()[0] ?? `${seed.origin}/sitemap.xml`);
+  const children = top.filter((u) => /\.xml$/i.test(new URL(u).pathname)).slice(0, 10);
+  return [...top, ...(await Promise.all(children.map(read))).flat()];
 }
 
 const ASSET = /\.(xml|gz|zip|pdf|jpe?g|png|gif|webp|svg|ico|css|js|json|mp[34]|webm|woff2?|ttf|exe|dmg)$/i;
@@ -72,7 +79,9 @@ export async function startCrawl(env: Env, rawUrl: string, lim: number, depth: n
 // and the job's status converges.
 // shortcut: a message the platform drops after retries leaves its page `queued` until the job expires (24 h);
 // add a dead-letter queue if stuck jobs show up.
-export async function crawlPage(env: Env, msg: CrawlMsg): Promise<void> {
+// `retryLater` is set while the message has attempts left: a JS page that finds the shared browser busy (1 page / 10 s)
+// goes back on the queue instead of failing.
+export async function crawlPage(env: Env, msg: CrawlMsg, retryLater?: () => void): Promise<void> {
   const job = await env.DB.prepare("SELECT * FROM jobs WHERE id = ?").bind(msg.job).first<Job>();
   if (!job) return; // expired and cleaned up
   const f: Formats = JSON.parse(job.formats);
@@ -82,6 +91,7 @@ export async function crawlPage(env: Env, msg: CrawlMsg): Promise<void> {
     found = await discover(env, job, doc.links ?? []);
     data = { ...doc, links: f.links ? doc.links : undefined, markdown: doc.markdown?.slice(0, MAX_MARKDOWN) };
   } catch (e) {
+    if (e instanceof ApiError && e.code === "RENDER_BUSY" && retryLater) return retryLater(); // page stays `queued`
     status = "failed";
     data = e instanceof ApiError ? { code: e.code, error: e.message } : { code: "UNKNOWN_ERROR", error: "internal error" };
   }

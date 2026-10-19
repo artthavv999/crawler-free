@@ -7,7 +7,14 @@ import type { Env } from "../src/index";
 import { clientKey, rateLimit } from "../src/limits";
 import { robotsBody } from "../src/robots";
 import { extract, fitsRow } from "../src/scrape";
-import { claim, discover, type Job } from "../src/crawl";
+import { claim, discover, sitemapLocs, type Job } from "../src/crawl";
+
+it("sitemap reader finds page URLs and child sitemaps but not image URLs", () => {
+  const index = `<sitemapindex><sitemap><loc>https://s.example/post-sitemap.xml</loc></sitemap><sitemap><loc> https://s.example/page-sitemap.xml </loc></sitemap></sitemapindex>`;
+  expect(sitemapLocs(index)).toEqual(["https://s.example/post-sitemap.xml", "https://s.example/page-sitemap.xml"]);
+  const pages = `<urlset><url><loc>https://s.example/a?x=1&amp;b=2</loc><image:image><image:loc>https://s.example/i.png</image:loc></image:image></url></urlset>`;
+  expect(sitemapLocs(pages)).toEqual(["https://s.example/a?b=2&x=1"]);
+});
 import { extractJson } from "../src/json";
 import { asText, createSetup } from "../src/setups";
 

@@ -22,6 +22,7 @@ queue = "crawler-free"
 [[queues.consumers]]
 queue = "crawler-free"
 max_batch_size = 1 # one page per invocation keeps each run inside 50 subrequests / 10 ms CPU
+max_retries = 6    # covers the 5 busy-browser retries in index.ts plus one platform failure
 
 [triggers]
 crons = ["0 * * * *"] # hourly cleanup

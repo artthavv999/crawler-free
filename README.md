@@ -42,9 +42,9 @@ PowerShell: `Invoke-RestMethod -Method Post -Uri https://crawler-free.crawler-fr
 | Scrapes | 20 per minute (`429` + `Retry-After`) |
 | JSON extractions | 20 per 24 h, counted from your first request; only fresh AI runs count, not cached answers; shared free AI budget for everyone (`EXTRACT_BUDGET_EXHAUSTED` when spent) |
 | Saved setups | 20 new per 24 h; runs count as scrapes; deleted after 30 days without a run |
-| Crawls | 5 jobs per 24 h, counted from your first request; `limit` ≤ 50 pages; `maxDiscoveryDepth` ≤ 3; same host, under the start URL's path |
+| Crawls | 5 jobs per 24 h, counted from your first request; `limit` ≤ 100 pages; `maxDiscoveryDepth` ≤ 3; same host, under the start URL's path |
 | Page size / time | 5 MB, 15 s, at most 5 redirects |
-| JavaScript pages | Rendered by Cloudflare Browser Run only when static HTML is near-empty; small shared daily budget (`RENDER_BUDGET_EXHAUSTED`) |
+| JavaScript pages | Rendered by Cloudflare Browser Run only when static HTML is near-empty; one page every 10 s and a small shared daily budget (`RENDER_BUSY` with `Retry-After: 10`, or `RENDER_BUDGET_EXHAUSTED`); crawls retry busy pages themselves |
 | Cache | Results cached 1 h by normalised URL + formats |
 | Retention | Crawl results deleted after 24 h; saved setups (address + settings only) after 30 days unused; no permanent archive; Workers logs kept 3 days |
 
