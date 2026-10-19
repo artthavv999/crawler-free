@@ -50,7 +50,7 @@ WHATWG `URL` (normalises `127.1`, `2130706433`, `0x7f000001` → `127.0.0.1`); a
 | `limits.ts` | client key (IPv4 / IPv6 /64), D1 counters, `Retry-After` | 24 |
 | `setups.ts` | saved setups (address + mode + fields), `/run/{id}` plain-text runner, 30-day expiry | 39 |
 | **total** | | **566** |
-Plus `public/` (web page: `index.html`, `app.js`, `style.css`, `_headers` CSP), served as Workers static assets. Added at the user's request after Phase 4 (the brief had excluded UI); it only calls the API above, so every limit and rule still applies.
+Plus `public/` (web page: `index.html`, `style.css`, `_headers` CSP, fonts, and scripts built from `ui/` by `npm run build:ui`), served as Workers static assets. Added at the user's request after Phase 4 (the brief had excluded UI); it only calls the API above, so every limit and rule still applies. Redesigned on 2026-10-19 (dark theme, result tabs, WebGL hero with static fallbacks); see [ui-redesign-notes.md](ui-redesign-notes.md).
 Plus `schema.sql` (D1), `wrangler.toml`, `test/units.test.ts` (URL validator, robots, normalisation, rate limiter, extractor, crawl claim).
 JSON model note: the 8B models on the JSON Mode docs page were deprecated on 2026-05-30 (Workers AI error 5028); `llama-3.2-3b-instruct` is the smallest current model that passed the acceptance test.
 

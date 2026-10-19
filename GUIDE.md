@@ -17,7 +17,7 @@ Open **https://crawler-free.crawler-free.workers.dev** in your browser.
 
 1. Paste the web page address into **Web page address**.
 2. Choose what you want: **The page's text**, **All the links**, **Specific facts** (then type the facts, for example `title, price`), or **The whole website** (then choose how many pages).
-3. Press **Go**. The answer appears below, with **Copy** and **Download** buttons.
+3. Press **Go**. The answer appears below, with **Copy** and **Download** buttons. Tabs above the answer switch between the page's text (**Markdown**), its **Links**, your facts (**JSON**) and page details (**Metadata**); Copy and Download use the tab you're on.
 
 ### Do it again with one click: saved setups
 

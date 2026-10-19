@@ -1,0 +1,3 @@
+# Built web page scripts hold newlines inside template strings; keep them byte-for-byte (no CRLF conversion on Windows).
+public/*.js -text
+public/chunks/*.js -text

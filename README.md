@@ -83,3 +83,5 @@ npx wrangler deploy
 Optional JS rendering: `npx wrangler secret put CF_ACCOUNT_ID` and `npx wrangler secret put CF_BROWSER_TOKEN` (API token with "Browser Run - Edit"). Kill switch: set `DISABLED = "1"` in `wrangler.toml` and deploy; every endpoint and queued crawl stops.
 
 Development: `npx tsc --noEmit` and `npx vitest run`. Design notes: [docs/DESIGN.md](docs/DESIGN.md).
+
+Web page: the scripts are written in `ui/` and bundled into `public/` with `npm run build:ui` (esbuild; gsap, lenis and ogl are bundled in, nothing loads from a CDN). The built files are committed, so `wrangler deploy` needs no build step. Redesign notes and screenshots: [docs/ui-redesign-notes.md](docs/ui-redesign-notes.md), [docs/screenshots/](docs/screenshots/).

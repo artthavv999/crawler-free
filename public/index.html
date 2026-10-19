@@ -3,70 +3,369 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Crawler Free</title>
-  <meta name="description" content="Free web page reader: get a page's text, its links, specific facts, or a whole website. No sign-up.">
+  <title>Crawler Free: any web page as clean text, links or facts</title>
+  <meta name="description" content="Free web page reader: get a page's text, its links, specific facts, or a whole website. No sign-up, no key.">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#07090d">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="/fonts/space-grotesk.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/jetbrains-mono.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/style.css">
-  <script src="/app.js" defer></script>
+  <script src="/boot.js"></script>
+  <script type="module" src="/app.js"></script>
 </head>
 <body>
+  <a class="skip" href="#url">Skip to the web page address</a>
+
+  <div class="preloader" aria-hidden="true">
+    <p class="preloader-mark">Crawler Free</p>
+    <div class="preloader-line"><span></span></div>
+    <p class="preloader-hint">Press any key to skip</p>
+  </div>
+
+  <div class="backdrop" aria-hidden="true">
+    <div class="glow glow-a"></div>
+    <div class="glow glow-b"></div>
+    <div class="grid"></div>
+    <div class="grain"></div>
+  </div>
+
+  <header class="top" id="top">
+    <a class="brand" href="/">
+      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6" cy="7" r="2.2"/><circle cx="18" cy="5" r="1.8"/><circle cx="17" cy="17" r="2.2"/><circle cx="7" cy="18" r="1.6"/><path d="M8 7.6 16.3 5.4M7.6 8.8l8 6.6M8.3 16.8l6.6-.2M17.6 6.8l-.4 8"/></svg>
+      <span>Crawler Free</span>
+    </a>
+    <nav aria-label="Sections">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#api">API</a>
+      <a href="#faq">FAQ</a>
+      <a class="nav-guide" href="https://github.com/artthavv999/crawler-free/blob/main/GUIDE.md">Guide</a>
+    </nav>
+  </header>
+
   <main>
-    <h1>Crawler Free</h1>
-    <p class="lead">Paste a web page address, choose what you want, and press <strong>Go</strong>.</p>
+    <section class="hero" id="tool" aria-labelledby="hero-title">
+      <div class="hero-art" aria-hidden="true"></div>
+      <div class="wrap hero-inner">
+        <p class="eyebrow" data-scramble>Free · no key · no sign-up</p>
+        <h1 id="hero-title">Turn any web page into clean text.</h1>
+        <p class="lead">Paste an address, choose what you want, and press <strong>Go</strong>. You get the page's text as Markdown, all its links, specific facts as JSON, or a whole website.</p>
 
-    <form id="form" novalidate>
-      <label for="url">Web page address</label>
-      <input id="url" type="url" inputmode="url" autocomplete="url" placeholder="https://books.toscrape.com/">
+        <form id="form" class="reader" novalidate>
+          <label class="field-label" for="url">Web page address</label>
+          <div class="url-row">
+            <input id="url" type="url" inputmode="url" autocomplete="url" spellcheck="false" placeholder="https://books.toscrape.com/">
+            <button type="submit" id="go" class="primary">
+              <span>Go</span>
+              <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10h11M11 5l5 5-5 5"/></svg>
+            </button>
+          </div>
 
-      <fieldset>
-        <legend>What do you want?</legend>
-        <label class="choice"><input type="radio" name="mode" value="text" checked> The page's text</label>
-        <label class="choice"><input type="radio" name="mode" value="links"> All the links</label>
-        <label class="choice"><input type="radio" name="mode" value="facts"> Specific facts</label>
-        <label class="choice"><input type="radio" name="mode" value="site"> The whole website</label>
-      </fieldset>
+          <fieldset class="modes">
+            <legend class="field-label">What do you want?</legend>
+            <div class="mode-list">
+              <label class="choice"><input type="radio" name="mode" value="text" checked><span>The page's text</span></label>
+              <label class="choice"><input type="radio" name="mode" value="links"><span>All the links</span></label>
+              <label class="choice"><input type="radio" name="mode" value="facts"><span>Specific facts</span></label>
+              <label class="choice"><input type="radio" name="mode" value="site"><span>The whole website</span></label>
+            </div>
+          </fieldset>
 
-      <div id="facts-box" hidden>
-        <label for="fields">Facts you want, separated by commas</label>
-        <input id="fields" placeholder="title, price">
+          <div id="facts-box" class="extra" hidden>
+            <label class="field-label" for="fields">Facts you want, separated by commas</label>
+            <input id="fields" placeholder="title, price">
+          </div>
+
+          <div id="site-box" class="extra" hidden>
+            <label class="field-label" for="limit">How many pages (1 to 100)</label>
+            <input id="limit" type="number" min="1" max="100" value="10">
+          </div>
+
+          <div class="form-foot">
+            <button type="button" id="save" class="ghost">Save as a one-click setup</button>
+            <p class="form-note">Follows robots.txt · Firecrawl v2-compatible API · MIT licensed</p>
+          </div>
+        </form>
+
+        <p id="status" role="status" aria-live="polite"></p>
+
+        <section id="result" class="panel result" hidden aria-labelledby="result-title">
+          <div class="result-head">
+            <div>
+              <h2 id="result-title">Result</h2>
+              <p id="result-source" class="result-source"></p>
+            </div>
+            <div class="result-actions">
+              <button type="button" id="copy" class="ghost">Copy</button>
+              <button type="button" id="download" class="ghost">Download</button>
+            </div>
+          </div>
+          <div id="result-loading" class="loading" hidden>
+            <div class="crawl-line" aria-hidden="true"><span></span></div>
+            <p id="loading-text" class="loading-text" aria-hidden="true">Reading the page…</p>
+            <div id="progress" class="progress" role="progressbar" aria-label="Pages read" aria-valuemin="0" aria-valuemax="1" aria-valuenow="0" hidden><span></span></div>
+            <div class="skeleton" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+          </div>
+          <div id="result-body">
+            <div class="tabs" role="tablist" aria-label="Result formats" id="result-tabs"></div>
+            <div id="out"></div>
+          </div>
+        </section>
+
+        <section id="saved" class="panel saved" hidden aria-labelledby="saved-title">
+          <h2 id="saved-title">Your saved setups</h2>
+          <p class="hint">Run one with a single click, open its link in any browser, or paste its command into a terminal.</p>
+          <ul id="setups"></ul>
+        </section>
       </div>
+    </section>
 
-      <div id="site-box" hidden>
-        <label for="limit">How many pages (1 to 100)</label>
-        <input id="limit" type="number" min="1" max="100" value="10">
-      </div>
+    <section class="section" id="features" aria-labelledby="features-title" tabindex="-1">
+      <div class="wrap">
+        <p class="eyebrow" data-scramble>Features</p>
+        <h2 id="features-title" data-reveal>Four ways to read a site, two ways to repeat it.</h2>
 
-      <div class="actions">
-        <button type="submit" id="go">Go</button>
-        <button type="button" id="save" class="secondary">Save as a one-click setup</button>
-      </div>
-    </form>
+        <div class="feature-tabs card glowy" data-tilt>
+          <div class="tabs" role="tablist" aria-label="Features">
+            <button type="button" role="tab" id="ft-text" aria-controls="fp-text" aria-selected="true">Page text</button>
+            <button type="button" role="tab" id="ft-links" aria-controls="fp-links" aria-selected="false" tabindex="-1">All the links</button>
+            <button type="button" role="tab" id="ft-facts" aria-controls="fp-facts" aria-selected="false" tabindex="-1">Specific facts</button>
+            <button type="button" role="tab" id="ft-site" aria-controls="fp-site" aria-selected="false" tabindex="-1">Whole website</button>
+            <button type="button" role="tab" id="ft-setups" aria-controls="fp-setups" aria-selected="false" tabindex="-1">One-click setups</button>
+            <button type="button" role="tab" id="ft-api" aria-controls="fp-api" aria-selected="false" tabindex="-1">Developer API</button>
+          </div>
 
-    <p id="status" role="status" aria-live="polite"></p>
+          <div class="feature-panel" role="tabpanel" id="fp-text" aria-labelledby="ft-text" tabindex="0">
+            <div class="feature-copy">
+              <h3>The page's text, without the clutter</h3>
+              <p>Menus, cookie banners, sidebars and other page furniture are removed. What's left comes back as clean Markdown you can read, paste into notes, or hand to an AI.</p>
+              <ul class="facts">
+                <li>Headings, lists and code blocks come through as Markdown</li>
+                <li>Pages that need JavaScript are opened in a real browser when their HTML is nearly empty</li>
+                <li>Answers are cached for 1 hour</li>
+              </ul>
+              <button type="button" class="ghost try" data-mode="text">Try it</button>
+            </div>
+            <pre class="card code" data-lenis-prevent><code><span class="c">POST</span> /v2/scrape
+{ "url": "https://example.com",
+  "formats": ["markdown"] }
 
-    <section id="result" hidden>
-      <div class="bar">
-        <h2>Result</h2>
-        <div>
-          <button type="button" id="copy" class="secondary">Copy</button>
-          <button type="button" id="download" class="secondary">Download</button>
+<span class="c">→</span> data.markdown</code></pre>
+          </div>
+
+          <div class="feature-panel" role="tabpanel" id="fp-links" aria-labelledby="ft-links" tabindex="0" hidden>
+            <div class="feature-copy">
+              <h3>Every link on the page</h3>
+              <p>A list of the links on the page, one per line, ready to paste into a spreadsheet or feed into your own crawler.</p>
+              <ul class="facts">
+                <li>Read from the page itself</li>
+                <li>Shown together with the page's text, in its own tab</li>
+                <li>Same limit as a page read: 20 a minute</li>
+              </ul>
+              <button type="button" class="ghost try" data-mode="links">Try it</button>
+            </div>
+            <pre class="card code" data-lenis-prevent><code><span class="c">POST</span> /v2/scrape
+{ "url": "https://example.com",
+  "formats": ["links"] }
+
+<span class="c">→</span> data.links</code></pre>
+          </div>
+
+          <div class="feature-panel" role="tabpanel" id="fp-facts" aria-labelledby="ft-facts" tabindex="0" hidden>
+            <div class="feature-copy">
+              <h3>Just the facts you name</h3>
+              <p>Type the facts you want, such as <code>title, price</code>. An AI model on Cloudflare reads the page and answers with neat JSON, one value per fact.</p>
+              <ul class="facts">
+                <li>20 fresh look-ups per 24 hours; cached answers don't count</li>
+                <li>Runs on a free AI budget shared by everyone</li>
+                <li>Every fact you name comes back as a key</li>
+              </ul>
+              <button type="button" class="ghost try" data-mode="facts">Try it</button>
+            </div>
+            <pre class="card code" data-lenis-prevent><code><span class="c">POST</span> /v2/scrape
+{ "url": "https://example.com",
+  "formats": [{ "type": "json",
+    "schema": { "type": "object",
+      "properties": {
+        "title": { "type": "string" } } } }] }
+
+<span class="c">→</span> data.json</code></pre>
+          </div>
+
+          <div class="feature-panel" role="tabpanel" id="fp-site" aria-labelledby="ft-site" tabindex="0" hidden>
+            <div class="feature-copy">
+              <h3>A whole website, page by page</h3>
+              <p>Start from one address and Crawler Free follows the site's sitemap and links, reading each page politely and waiting between requests.</p>
+              <ul class="facts">
+                <li>Up to 100 pages, up to 3 links deep</li>
+                <li>Stays on the same site, under the starting address's path</li>
+                <li>5 whole-website reads per 24 hours; results kept for 24 hours</li>
+              </ul>
+              <button type="button" class="ghost try" data-mode="site">Try it</button>
+            </div>
+            <pre class="card code" data-lenis-prevent><code><span class="c">POST</span> /v2/crawl
+{ "url": "https://example.com",
+  "limit": 10 }
+
+<span class="c">GET</span>  /v2/crawl/{id}
+<span class="c">→</span> status, completed, total, data[]</code></pre>
+          </div>
+
+          <div class="feature-panel" role="tabpanel" id="fp-setups" aria-labelledby="ft-setups" tabindex="0" hidden>
+            <div class="feature-copy">
+              <h3>Save it once, re-run it in one step</h3>
+              <p>Save an address and what you want from it. After that, press <strong>Run</strong>, open its link in any browser, or paste one command into a terminal.</p>
+              <ul class="facts">
+                <li>Works for page text, links and facts</li>
+                <li>Keeps only the address and settings, never page content</li>
+                <li>Deleted after 30 days without a run</li>
+              </ul>
+              <button type="button" class="ghost try" data-mode="text">Try it</button>
+            </div>
+            <pre class="card code" data-lenis-prevent><code><span class="c">#</span> PowerShell
+irm <span data-origin>https://crawler-free.crawler-free.workers.dev</span>/run/&lt;id&gt;
+
+<span class="c">→</span> the answer, as plain text</code></pre>
+          </div>
+
+          <div class="feature-panel" role="tabpanel" id="fp-api" aria-labelledby="ft-api" tabindex="0" hidden>
+            <div class="feature-copy">
+              <h3>The same API, from your code</h3>
+              <p>Crawler Free answers Firecrawl's v2 requests for scrape and crawl, so the official Firecrawl JavaScript SDK works with it. No key needed.</p>
+              <ul class="facts">
+                <li>Errors come back as <code>{ success: false, code, error }</code></li>
+                <li>Unsupported options are ignored and listed in <code>warning</code></li>
+                <li>Source code on GitHub, MIT licensed</li>
+              </ul>
+              <a class="ghost try" href="#api">See examples</a>
+            </div>
+            <pre class="card code" data-lenis-prevent><code><span class="c">import</span> Firecrawl <span class="c">from</span> "@mendable/firecrawl-js";
+
+const app = new Firecrawl({
+  apiKey: "fc-keyless",
+  apiUrl: "<span data-origin>https://crawler-free.crawler-free.workers.dev</span>",
+});
+const page = await app.scrape("https://example.com");</code></pre>
+          </div>
         </div>
       </div>
-      <pre id="out"></pre>
     </section>
 
-    <section id="saved" hidden>
-      <h2>Your saved setups</h2>
-      <p class="hint">Run one with a single click, open its link in any browser, or paste its command into a terminal.</p>
-      <ul id="setups"></ul>
+    <section class="section" id="how" aria-labelledby="how-title" tabindex="-1">
+      <div class="wrap">
+        <p class="eyebrow" data-scramble>How it works</p>
+        <h2 id="how-title" data-reveal>Three steps, no account.</h2>
+        <ol class="steps">
+          <li class="step card glowy" data-curtain>
+            <span class="step-n">01</span>
+            <h3>Paste an address</h3>
+            <p>Any public web page. Choose its text, its links or specific facts, or the whole website and how many pages.</p>
+          </li>
+          <li class="step card glowy" data-curtain>
+            <span class="step-n">02</span>
+            <h3>It reads politely</h3>
+            <p>It checks the site's robots.txt first, refuses private network addresses, and tells the site who it is. It never gets around logins or bot protection.</p>
+          </li>
+          <li class="step card glowy" data-curtain>
+            <span class="step-n">03</span>
+            <h3>Take the result</h3>
+            <p>Copy it, download it, or save it as a one-click setup you can run again from the page, a link, or a terminal.</p>
+          </li>
+        </ol>
+      </div>
     </section>
 
-    <footer>
-      <p>Crawler Free follows each site's robots.txt and never gets around bot protection.
-        Limits per connection: 20 pages a minute, 20 fact look-ups and 5 whole-website reads per 24 hours.</p>
-      <p><a href="https://github.com/artthavv999/crawler-free/blob/main/GUIDE.md">Guide</a> ·
-        <a href="https://github.com/artthavv999/crawler-free">Source code</a> ·
-        <a href="https://github.com/artthavv999/crawler-free/issues">Report a problem</a></p>
-    </footer>
+    <section class="section" id="api" aria-labelledby="api-title" tabindex="-1">
+      <div class="wrap api">
+        <div class="api-copy">
+          <p class="eyebrow" data-scramble>API</p>
+          <h2 id="api-title" data-reveal>Use it from code.</h2>
+          <p data-reveal>The same requests this page makes, from any language. There's no key and no sign-up, and the same free limits apply.</p>
+          <p data-reveal><a href="https://github.com/artthavv999/crawler-free#endpoints">All endpoints in the README</a></p>
+        </div>
+        <div class="snippets card glowy" data-tilt>
+          <div class="snippets-head">
+            <div class="tabs" role="tablist" aria-label="Code examples">
+              <button type="button" role="tab" id="st-curl" aria-controls="sp-curl" aria-selected="true">cURL</button>
+              <button type="button" role="tab" id="st-js" aria-controls="sp-js" aria-selected="false" tabindex="-1">JavaScript</button>
+              <button type="button" role="tab" id="st-py" aria-controls="sp-py" aria-selected="false" tabindex="-1">Python</button>
+            </div>
+            <button type="button" class="ghost small" id="copy-code">Copy code</button>
+          </div>
+          <div role="tabpanel" id="sp-curl" aria-labelledby="st-curl" tabindex="0">
+            <pre class="code" data-lenis-prevent><code>curl -X POST <span data-origin>https://crawler-free.crawler-free.workers.dev</span>/v2/scrape \
+  -H "content-type: application/json" \
+  -d '{"url":"https://example.com","formats":["markdown","links"]}'</code></pre>
+          </div>
+          <div role="tabpanel" id="sp-js" aria-labelledby="st-js" tabindex="0" hidden>
+            <pre class="code" data-lenis-prevent><code>const res = await fetch("<span data-origin>https://crawler-free.crawler-free.workers.dev</span>/v2/scrape", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ url: "https://example.com", formats: ["markdown", "links"] }),
+});
+const { data } = await res.json();
+console.log(data.markdown);</code></pre>
+          </div>
+          <div role="tabpanel" id="sp-py" aria-labelledby="st-py" tabindex="0" hidden>
+            <pre class="code" data-lenis-prevent><code>import requests
+
+res = requests.post(
+    "<span data-origin>https://crawler-free.crawler-free.workers.dev</span>/v2/scrape",
+    json={"url": "https://example.com", "formats": ["markdown", "links"]},
+    timeout=60,
+)
+print(res.json()["data"]["markdown"])</code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="faq" aria-labelledby="faq-title" tabindex="-1">
+      <div class="wrap faq">
+        <div>
+          <p class="eyebrow" data-scramble>FAQ</p>
+          <h2 id="faq-title" data-reveal>Questions.</h2>
+        </div>
+        <div class="accordion" data-stagger>
+          <div class="acc-item">
+            <h3><button type="button" class="acc-btn" id="q1" aria-expanded="false" aria-controls="a1">Is it really free? Do I need a key?</button></h3>
+            <div class="acc-panel" id="a1" role="region" aria-labelledby="q1"><div><p>Yes, it's free. There's no sign-up, no key and no payment. It runs on Cloudflare's free tier, so every connection gets the same fair-use limits.</p></div></div>
+          </div>
+          <div class="acc-item">
+            <h3><button type="button" class="acc-btn" id="q2" aria-expanded="false" aria-controls="a2">What are the limits?</button></h3>
+            <div class="acc-panel" id="a2" role="region" aria-labelledby="q2"><div><p>Per connection (one IPv4 address, or one IPv6 /64): 20 page reads a minute, plus 20 fact look-ups, 5 whole-website reads and 20 new saved setups per 24 hours. A whole-website read covers up to 100 pages. When you hit a limit, the message says how long to wait.</p></div></div>
+          </div>
+          <div class="acc-item">
+            <h3><button type="button" class="acc-btn" id="q3" aria-expanded="false" aria-controls="a3">Will it read any website?</button></h3>
+            <div class="acc-panel" id="a3" role="region" aria-labelledby="q3"><div><p>Only what a site allows. It obeys each site's robots.txt and never gets around logins, paywalls or bot protection; a blocked page returns an error instead. Private and local network addresses are refused.</p></div></div>
+          </div>
+          <div class="acc-item">
+            <h3><button type="button" class="acc-btn" id="q4" aria-expanded="false" aria-controls="a4">What about pages that need JavaScript?</button></h3>
+            <div class="acc-panel" id="a4" role="region" aria-labelledby="q4"><div><p>If a page's HTML is nearly empty, it's opened in Cloudflare's Browser Run. That browser is shared and has a small daily budget, so at busy moments you may be asked to try again in 10 seconds. Whole-website reads retry busy pages by themselves.</p></div></div>
+          </div>
+          <div class="acc-item">
+            <h3><button type="button" class="acc-btn" id="q5" aria-expanded="false" aria-controls="a5">What do you keep?</button></h3>
+            <div class="acc-panel" id="a5" role="region" aria-labelledby="q5"><div><p>Answers are cached for 1 hour. Whole-website results are deleted after 24 hours. A saved setup keeps only the address and settings, and is deleted after 30 days without a run. Your list of saved setups lives in this browser.</p></div></div>
+          </div>
+          <div class="acc-item">
+            <h3><button type="button" class="acc-btn" id="q6" aria-expanded="false" aria-controls="a6">How do I stop it reading my site?</button></h3>
+            <div class="acc-panel" id="a6" role="region" aria-labelledby="q6"><div><p>Disallow <code>CrawlerFree</code> in your robots.txt, or <a href="https://github.com/artthavv999/crawler-free/issues">open an issue on GitHub</a>.</p></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
   </main>
+
+  <footer class="foot">
+    <div class="wrap foot-inner">
+      <p>Crawler Free · MIT licence</p>
+      <p class="foot-links">
+        <a href="https://github.com/artthavv999/crawler-free/blob/main/GUIDE.md">Guide</a>
+        <a href="https://github.com/artthavv999/crawler-free">Source code</a>
+        <a href="https://github.com/artthavv999/crawler-free/issues">Report a problem</a>
+      </p>
+    </div>
+  </footer>
 </body>
 </html>
