@@ -106,3 +106,24 @@ it("refuses page reads once the shared page-read budget is used up", async () =>
   await again.body?.cancel();
   expect(await counter("scrape-day:192.0.2.20")).toBe(spent); // known used up: refused before the caller's own limits
 });
+
+it("caps crawl status polls per connection and bounds skip", async () => {
+  const id = "11111111-2222-4333-8444-555555555555", now = Math.floor(Date.now() / 1000);
+  await db().prepare("INSERT OR REPLACE INTO jobs (id, scope, lim, depth, formats, self, created) VALUES (?, 'https://a.example/', 10, 1, '{}', '', ?)").bind(id, now).run();
+  await db().prepare("INSERT OR REPLACE INTO pages (job, url, depth, status, data) VALUES (?, 'https://a.example/', 0, 'done', '{\"markdown\":\"x\",\"metadata\":{}}')").bind(id).run();
+  const get = (q: string, ip: string) => SELF.fetch(`${BASE}/v2/crawl/${id}${q}`, { headers: { "cf-connecting-ip": ip } });
+  const far = await get("?skip=999999", "192.0.2.50");
+  expect(far.status).toBe(200);
+  expect(await far.json()).toMatchObject({ success: true, status: "completed", completed: 1, data: [], next: null });
+  await setCounter("poll-day:192.0.2.51", 2000);
+  const capped = await get("", "192.0.2.51");
+  expect(capped.status).toBe(429);
+  expect(await capped.json()).toMatchObject({ error: expect.stringMatching(/^You've used all 2,000 crawl status checks allowed per 24 hours\./) });
+});
+
+it("caps setup removals at 30 a minute per connection", async () => {
+  await setCounter("delete:192.0.2.60", 30);
+  const res = await SELF.fetch(`${BASE}/v2/setups/abcdefghij`, { method: "DELETE", headers: { "cf-connecting-ip": "192.0.2.60" } });
+  expect(res.status).toBe(429);
+  expect(await res.json()).toMatchObject({ error: expect.stringMatching(/^You've used all 30 setup removals allowed per minute\./) });
+});

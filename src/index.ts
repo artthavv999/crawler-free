@@ -132,6 +132,7 @@ async function handle(req: Request, env: Env): Promise<Response> {
     }
     const [, kind, sid] = pathname.match(/^\/(run|v2\/setups)\/([a-z0-9]{10})$/) ?? [];
     if (sid && kind === "v2/setups" && req.method === "DELETE") {
+      await rateLimit(env.DB, "delete", client, 30, 60);
       await env.DB.prepare("DELETE FROM setups WHERE id = ?").bind(sid).run();
       return json(200, { success: true });
     }
@@ -144,9 +145,14 @@ async function handle(req: Request, env: Env): Promise<Response> {
       return new Response(asText(doc, s.mode), { headers: { "content-type": "text/plain; charset=utf-8", ...headers } });
     }
     const id = pathname.startsWith("/v2/crawl/") ? pathname.slice(10) : "";
-    // shortcut: status polls are not rate limited (the SDK polls every 2 s); Workers' 100k requests/day is the cap.
-    // Add a per-IP limit if polling dominates the daily request count.
-    if (req.method === "GET" && /^[0-9a-f-]{36}$/.test(id)) return json(200, await crawlStatus(env, id, Math.max(0, parseInt(searchParams.get("skip") ?? "0") || 0), origin));
+    if (req.method === "GET" && /^[0-9a-f-]{36}$/.test(id)) {
+      // Status polls: 60 a minute and 2,000 a day per connection (the SDK polls every 2 s, the web page every 3 s).
+      // One poll reads up to ~200 D1 rows, and D1's 5M free reads a day are shared by every request.
+      await rateLimit(env.DB, "poll", client, 60, 60);
+      await rateLimit(env.DB, "poll-day", client, 2000, 86400);
+      const skip = Math.min(100, Math.max(0, parseInt(searchParams.get("skip") ?? "0") || 0)); // a job holds at most 100 pages
+      return json(200, await crawlStatus(env, id, skip, origin));
+    }
     throw new ApiError(404, "NOT_FOUND", `no route ${req.method} ${pathname}`);
   } catch (e) {
     if (!(e instanceof ApiError)) console.error(e);

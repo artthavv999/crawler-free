@@ -19,11 +19,29 @@ function v4(ip: string): number {
   return ip.split(".").reduce((n, o) => n * 256 + +o, 0);
 }
 
+// An IPv6 address as a 128-bit number; null for anything that isn't 8 hextets (embedded IPv4 forms included).
+function v6(ip: string): bigint | null {
+  const halves = ip.toLowerCase().split("::");
+  if (halves.length > 2 || ip.includes(".")) return null;
+  const h = halves[0] ? halves[0].split(":") : [], t = halves[1] ? halves[1].split(":") : [];
+  if (halves.length === 2 && h.length + t.length > 7) return null;
+  const parts = halves.length === 2 ? [...h, ...Array(8 - h.length - t.length).fill("0"), ...t] : h;
+  if (parts.length !== 8 || !parts.every((p) => /^[0-9a-f]{1,4}$/.test(p))) return null;
+  return parts.reduce((n, p) => (n << 16n) | BigInt(parseInt(p, 16)), 0n);
+}
+const cidr6 = (c: string) => { const [ip, bits] = c.split("/"); return [v6(ip)!, BigInt(bits)] as const; };
+const in6 = (n: bigint, [base, bits]: readonly [bigint, bigint]) => n >> (128n - bits) === base >> (128n - bits);
+// Allow only global unicast 2000::/3 (so ::1, ::ffff:0:0/96, fc00::/7, fe80::/10, ff00::/8, 64:ff9b::/96 all fail),
+// minus the IANA special-purpose blocks inside it that aren't ordinary internet hosts (registry checked 2026-10-19):
+// 2001::/23 IETF protocol assignments (Teredo, benchmarking, ORCHID…), 2001:db8::/32 and 3fff::/20 documentation,
+// 2002::/16 6to4 (it can embed any IPv4 address, private ones included).
+const V6_GLOBAL = cidr6("2000::/3");
+const V6_DENY = "2001::/23 2001:db8::/32 2002::/16 3fff::/20".split(" ").map(cidr6);
+
 export function isPublicIp(ip: string): boolean {
   if (ip.includes(":")) {
-    // Allow-list global unicast 2000::/3; this alone excludes ::1, ::ffff:0:0/96, fc00::/7, fe80::/10, ff00::/8, 64:ff9b::/96.
-    const [a, b] = ip.toLowerCase().split(":").map((h) => parseInt(h || "0", 16));
-    return a >= 0x2000 && a <= 0x3fff && a !== 0x2002 && !(a === 0x2001 && (b === 0 || b === 0xdb8));
+    const n = v6(ip);
+    return n !== null && in6(n, V6_GLOBAL) && !V6_DENY.some((c) => in6(n, c));
   }
   if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) return false;
   const n = v4(ip);

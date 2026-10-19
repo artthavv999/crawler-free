@@ -3,7 +3,8 @@ import { env } from "cloudflare:workers";
 import { beforeAll, expect, it } from "vitest";
 import schema from "../schema.sql?raw";
 import type { Env } from "../src/index";
-import { ApiError, readCapped } from "../src/guard";
+import { discover, type Job } from "../src/crawl";
+import { ApiError, checkUrl, isPublicIp, readCapped } from "../src/guard";
 import { extractJson } from "../src/json";
 
 // Regression tests for the HTTP-level defences in src/index.ts. They go through the real Worker (SELF) and never
@@ -91,4 +92,23 @@ it("does not pass the AI service's own error text to callers", async () => {
     code: "EXTRACT_FAILED",
     message: expect.not.stringContaining("0123abcd"),
   });
+});
+
+it("treats IANA special-purpose IPv6 blocks, malformed addresses and odd IPv4 spellings as non-public", () => {
+  const notPublic = ["3fff::1", "3fff:fff:ffff::1", "2001:2::1", "2001:10::1", "2001:20::1", "2001:1ff:ffff::1", "2001:db8:ffff::1",
+    "2002:a00:1::1", "::", "::ffff:7f00:1", "::ffff:10.0.0.1", "fc00::1", "ff02::1", "1:2:3:4:5:6:7:8:9", "2001:db8::1::2", "gggg::1"];
+  for (const ip of notPublic) expect(isPublicIp(ip), ip).toBe(false);
+  for (const ip of ["2606:4700:4700::1111", "2a00:1450:4001:80b::200e", "2001:200::1", "2620:4f:8000::1"]) expect(isPublicIp(ip), ip).toBe(true);
+  const urls = ["http://0177.0.0.1/", "http://0/", "http://127.0.0.1./", "http://[0:0:0:0:0:ffff:7f00:1]/", "http://ⓛocalhost/",
+    "http://LOCALHOST./", "http://[fe80::1%25eth0]/", "http://metadata/", "http://169.254.169.254:80/"];
+  for (const u of urls) expect(() => checkUrl(u), u).toThrow(ApiError);
+});
+
+it("keeps crawls inside their starting folder on the same origin", async () => {
+  await db().prepare("INSERT OR REPLACE INTO robots (origin, body, expires) VALUES (?, ?, ?)").bind("https://s.example", "", 9e9).run();
+  const job: Job = { id: "scope", scope: "https://s.example/docs/", lim: 100, depth: 2, formats: "{}", self: "", created: 0 };
+  const links = ["https://s.example/docs/a", "https://S.EXAMPLE:443/docs/b?x=1#frag", "https://s.example/docsearch/x",
+    "https://s.example/docs/../admin", "https://s.example/docs/%2e%2e/admin", "https://s.example/", "http://s.example/docs/c",
+    "https://s.example.evil.example/docs/d", "https://evil.example/docs/e", "https://user@s.example/docs/f", "https://s.example/docs/report.pdf"];
+  expect(await discover(env as unknown as Env, job, links)).toEqual(["https://s.example/docs/a", "https://s.example/docs/b?x=1"]);
 });

@@ -47,6 +47,8 @@ PowerShell: `Invoke-RestMethod -Method Post -Uri https://crawler-free.crawler-fr
 | Saved setups | 20 new per 24 h; runs count as scrapes; deleted after 30 days without a run |
 | Crawls | 5 jobs per 24 h, counted from your first request, and 10 per 24 h for your whole network (IPv4 /24 or IPv6 /48); `limit` ≤ 100 pages; `maxDiscoveryDepth` ≤ 3; same host, under the start URL's path |
 | Shared daily budgets (everyone together, reset at 00:00 UTC) | 15,000 page reads and 2,500 crawled pages per day. When one is used up, that feature answers `503 DAILY_BUDGET_EXHAUSTED` with `Retry-After` until midnight UTC, and running crawls stop adding pages. They keep the free plan's database and queue allowances from running out, which would stop everything |
+| Crawl status polls | 60 per minute and 2,000 per 24 h (`skip` capped at 100) |
+| Removing setups | 30 per minute |
 | Page size / time | 5 MB, 15 s, at most 5 redirects |
 | JavaScript pages | Rendered by Cloudflare Browser Run only when static HTML is near-empty; one page every 10 s and a small shared daily budget (`RENDER_BUSY` with `Retry-After: 10`, or `RENDER_BUDGET_EXHAUSTED`); crawls retry busy pages themselves |
 | Cache | Results cached 1 h by normalised URL + formats |

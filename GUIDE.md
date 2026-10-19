@@ -265,6 +265,7 @@ These are per internet connection:
 | Pulling out facts (Step 5) | 20 per 24 hours; answers saved from the last hour don't count. Everyone on your network together: 60 per 24 hours |
 | Crawls / whole-website reads (Step 6) | 5 per 24 hours, up to 100 pages each. Everyone on your network together: 10 per 24 hours |
 | Saving new setups | 20 per 24 hours |
+| Checking a crawl's progress (Step 6) | 60 per minute, and 2,000 per 24 hours |
 
 The 24 hours start with your first request, not at midnight. For example, if your first crawl is at 9:00 and you use all 5, you can crawl again at 9:00 the next day.
 

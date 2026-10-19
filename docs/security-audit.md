@@ -34,8 +34,9 @@ brief). Protection relies on per-connection rate limits, the SSRF guard and robo
 | F4 | Low | API responses carry no security headers | Live: `GET /v2/nothing` returns only `Content-Type`. `public/_headers` covers static files only. `/run/{id}` returns third-party page text as `text/plain` without `nosniff`. | Fixed |
 | F5 | Low | Anyone holding a setup's run link can delete it | `src/index.ts` `DELETE /v2/setups/{id}` has no ownership check, and the ID is the same one in the shareable `/run/{id}` link. Local repro: DELETE returned 200, then run returned 404. IDs can't be guessed or enumerated, and setups hold only an address and settings. | Needs your approval (schema change) |
 | F6 | Low | Upstream error details are returned to callers | `src/scrape.ts` `render()` appends Browser Run's error codes and messages (for example authentication errors) to `SCRAPE_FAILED`. `src/json.ts` returns raw model error text. This exposes operator configuration state, but no secret values. | Fixed |
-| F7 | Low | Status polls and deletes aren't rate limited | `src/index.ts`: `GET /v2/crawl/{id}` (commented as a shortcut) and `DELETE`. Each is a cheap D1 call, but every request, including 404s, counts against the shared 100k requests per day. Per-IP limits on every route would need a WAF rule (custom domain only) or more D1 writes. | Documented |
+| F7 | **Medium** (corrected from Low after the second review) | Status polls and deletes aren't rate limited | `src/index.ts`: `GET /v2/crawl/{id}` (commented as a shortcut) and `DELETE`. One poll reads up to about 200 D1 rows (the job's page counts plus the page data), so one client polling a finished 100-page job every 2 s would use up D1's 5M free reads a day in about 13 hours, and then every request fails. My first rating called this "a cheap D1 call", which was wrong. | Fixed: polls 60/min and 2,000/day per connection, `skip` capped at 100; deletes 30/min |
 | F8 | Low (potential) | DNS rebinding window in the SSRF guard | `src/guard.ts:47` (acknowledged in code): the DoH check and `fetch()` resolve separately. Workers' outbound network should not reach private ranges, which limits the impact; **this was not verified here**. Redirect hops are re-checked. | Documented |
+| F16 | Low | Some IPv6 special-purpose blocks passed the SSRF address check | `src/guard.ts` `isPublicIp` allowed all of 2000::/3 except four hand-picked prefixes, so 3fff::/20 (documentation) and the rest of 2001::/23 (IETF protocol assignments, including 2001:2::/48 benchmarking) counted as public, against IANA's special-purpose registry. These addresses aren't routed on the internet, so the impact is small. Found by the second review. | Fixed: explicit block table, 128-bit matching, malformed addresses rejected |
 | F9 | Low (potential) | JavaScript-rendered pages can navigate without re-checks | `src/scrape.ts` `render()` checks only the starting URL. In Cloudflare's browser, script redirects and subresources aren't re-checked against robots.txt or the SSRF guard. The browser runs on Cloudflare's network, not this app's. **Not verified**. | Documented |
 | F10 | Low | Vulnerable packages in the dev toolchain only | `npm audit`: 5 high (sharp, undici via miniflare in wrangler and @cloudflare/vitest-pool-workers). Runtime dependencies: **0**. These packages aren't deployed, and npm's suggested "fix" is a downgrade. | Tracked by Dependabot |
 | F11 | Info | Prompt injection into fact extraction | `src/json.ts`: untrusted page text goes to the model. Existing mitigations: hidden text stripped, the system prompt says to ignore page instructions, JSON schema output, no tools, no secrets, and results go only to the requester. A page can influence only the facts reported about itself. | Accepted |
@@ -81,8 +82,8 @@ Every GitHub Action is pinned to a full commit SHA, and each container image to 
 | Check | Command | Result |
 |---|---|---|
 | Typecheck | `npx tsc --noEmit` | **Passed** |
-| Tests (with Cloudflare login) | `npx vitest run` | **Passed**: 27/27 (11 existing, 7 security, 9 limits for F2) |
-| Tests (no credentials, as CI runs them) | `CRAWLER_WRANGLER_CONFIG=./wrangler.ci.toml npx vitest run` with an empty Wrangler config dir | **Passed**: 27/27 |
+| Tests (with Cloudflare login) | `npx vitest run` | **Passed**: 31/31 (11 existing, 9 security, 11 limits) |
+| Tests (no credentials, as CI runs them) | `CRAWLER_WRANGLER_CONFIG=./wrangler.ci.toml npx vitest run` with an empty Wrangler config dir | **Passed**: 31/31 |
 | Secrets, git history | Gitleaks v8.30.1 (`gitleaks git`, container pinned by digest) | **Passed**: 17 commits, no leaks |
 | Secrets, working tree | Gitleaks `dir` | 33 findings, **all in `_ref/`** (git-ignored third-party clones, placeholder keys in their `.env.example` files); now allow-listed. 0 in this project's files. |
 | Secrets, files changed after that run | Pattern scan (keyword plus token, private keys, GitHub/AWS keys, 32-hex IDs) over 45 new or changed files | **Passed**: 0 matches |
@@ -114,11 +115,28 @@ No schema change: the existing `counters` table holds the new keys, and the hour
 
 **Still open (needs money or infrastructure, so your call):** a raw flood of requests, about 1.2 per second sustained for a day from any single client, uses up the 100,000 Worker requests even when every request is refused. Only edge rate limiting stops that. The options are a custom domain with Cloudflare's free rate-limiting rule (about $10 a year for the domain; the free rule only blocks for 10 s at a time) or Workers Paid ($5 a month, no daily request cap, usage billing). Turnstile wasn't used: API clients can't solve it, and an attacker would call the API directly.
 
+## Second review: the external "Preliminary Code Security Audit" (2026-10-19)
+
+That report was a static read of the public repository; it ran no code and no scans. Each finding below was checked against the current, uncommitted code.
+
+| Their finding | Verdict | What was done |
+|---|---|---|
+| 1. SSRF: DNS rebinding and browser rendering | **Valid design risk, not demonstrated** (same as F8 and F9) | DNS rebinding: Workers can't pin a resolved IP to `fetch()`, so the gap can't be closed in code; every redirect hop is still re-checked. Browser rendering: Browser Run accepts `rejectRequestPattern`, but Cloudflare's docs give an ambiguous pattern format (`'/^.*.(css)'`) and it can't be tested without the production token. A wrong pattern would silently block nothing, so it is **left for a live test after deploy**. Rendering can be switched off with no code change: `npx wrangler secret delete CF_BROWSER_TOKEN`. |
+| 2. Body size limit before JSON parsing | **Already fixed** (F3) | 64 KB, checked from `content-length` and while streaming; 413; tests for declared, streamed (no `content-length`) and malformed bodies. The "5 MB" in the docs is the fetched-page cap, not the request body limit. |
+| 3. Crawl-status polling not rate limited | **Valid; fixed now** (F7, re-rated Medium) | 60/min and 2,000/day per connection; `skip` capped at 100; tests. |
+| 4. Keyless access and shared-resource abuse | **Fixed earlier** (F2) | Per-connection, per-network and shared daily caps; refused requests write nothing. |
+| 5. Setup IDs (50 bits) and deletion | **Partly adopted** | Deletes now limited to 30/min. `Cache-Control: no-store` and `Referrer-Policy: no-referrer` were already in place. 50-bit IDs are kept for now: probing `/run/{id}` is capped at 20/min and 1,000/day per connection and 15,000/day overall, and DELETE answers the same whether or not a setup exists, so enumeration is not practical. 128-bit IDs or a separate delete key change the link format or the schema (F5), so that is your call. |
+| 6. IPv6 special-purpose ranges | **Valid; fixed** (F16) | Block table from IANA's registry; the IPv4 list was re-checked against IANA and is complete; tests for special blocks, malformed addresses and odd IPv4 spellings (octal, `0`, trailing dot, Unicode `localhost`, zone IDs, single-label hosts). |
+| 7. Crawl-scope path matching | **Not a bug; tests added** | 11 cases: sibling folder, `../` and `%2e%2e`, another scheme, look-alike host, user-info, default port, query and fragment, file assets. **Not adopted:** re-checking scope after redirects. `http`→`https` or `example.com`→`www.example.com` redirects would make whole crawls fail, and an off-scope redirect page can't spread, because discovered links are scope-filtered. |
+| P1: queue retries and stuck jobs | **Known shortcut** | Documented in `src/crawl.ts`: a page dropped after the retries stays queued until the job expires (24 h). A dead-letter queue would fix it. |
+| P1: kill switch | **Verified in code** | `DISABLED=1` makes every request return 503 and drops queued crawl messages. The hourly cleanup still runs, which is cheap and intended. |
+
 ## Remaining findings that need your decision
 
 1. **F2, raw request floods:** a custom domain with a rate-limiting rule, or Workers Paid; see above. The rest of F2 is fixed.
 2. **F5: a delete key for saved setups.** Return a separate secret at creation, store only its hash in a new `setups` column, and require it on DELETE; existing setups would stay deletable by ID until they expire. This is a schema change.
-3. **GitHub repository settings** (I can't change these from here, and they need your OK in any case):
+3. **F9, limiting Browser Run's sub-requests:** after a deploy, test whether `rejectRequestPattern` actually blocks requests to IP literals, `localhost` and single-label hosts, then keep it if it does. Or switch JavaScript rendering off (`npx wrangler secret delete CF_BROWSER_TOKEN`) until that is done; pages that need JavaScript would then return `RENDER_BUDGET_EXHAUSTED`.
+4. **GitHub repository settings** (I can't change these from here, and they need your OK in any case):
    - Settings → Code security: turn on **Private vulnerability reporting** (SECURITY.md points to it), **Dependabot alerts**, **Dependabot security updates**, and **Secret scanning** with **Push protection**.
    - Code scanning results appear after the first CodeQL run.
 

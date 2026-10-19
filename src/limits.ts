@@ -39,6 +39,9 @@ const LABELS: Record<string, { what: string; network?: boolean }> = {
   crawl: { what: "whole-website reads" },
   "crawl-net": { what: "whole-website reads", network: true },
   setup: { what: "new saved setups" },
+  delete: { what: "setup removals" },
+  poll: { what: "crawl status checks" },
+  "poll-day": { what: "crawl status checks" },
   "page-reads": { what: "page reads" },
   "crawl-pages": { what: "whole-website pages" },
 };
@@ -55,7 +58,7 @@ function remember(k: string, reset: number) {
 
 function tooMany(name: string, max: number, windowSec: number, wait: number): ApiError {
   const { what, network } = LABELS[name] ?? { what: name };
-  const per = windowSec === 60 ? "a minute" : windowSec === 86400 ? "24 hours" : `${windowSec} seconds`;
+  const per = windowSec === 60 ? "minute" : windowSec === 86400 ? "24 hours" : `${windowSec} seconds`;
   const message = network
     ? `Connections on your network have used all ${count(max)} ${what} allowed per ${per}. Try again in ${inWords(wait)}.`
     : `You've used all ${count(max)} ${what} allowed per ${per}. Try again in ${inWords(wait)}.`;
