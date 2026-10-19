@@ -1,0 +1,7 @@
+name: Crawler Free CodeQL config
+# The built, minified bundles are generated from ui/ (scanned) plus third-party libraries; the "Built web page matches
+# its sources" job in security.yml proves they contain nothing else.
+paths-ignore:
+  - public/app.js
+  - public/boot.js
+  - public/chunks

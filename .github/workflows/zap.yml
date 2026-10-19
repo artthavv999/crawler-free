@@ -1,0 +1,51 @@
+# OWASP ZAP baseline (passive scan + spider, no attacks) against a throwaway local instance started inside the runner:
+# `wrangler dev` with a local D1 and no Cloudflare credentials. Production is never scanned.
+# Accepted alerts and why: .zap/rules.tsv. Any new warning or failure fails the job.
+name: ZAP baseline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "5 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  zap:
+    name: ZAP baseline (local instance)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Start a local instance
+        env:
+          CI: "true"
+        run: |
+          npx wrangler d1 execute crawler-free --local -c wrangler.ci.toml --file schema.sql
+          npx wrangler dev -c wrangler.ci.toml --ip 127.0.0.1 --port 8787 > wrangler.log 2>&1 &
+          for i in $(seq 1 90); do curl -sf -o /dev/null http://127.0.0.1:8787/ && exit 0; sleep 1; done
+          cat wrangler.log
+          exit 1
+      - name: ZAP baseline scan
+        run: |
+          chmod a+w .zap
+          docker run --rm --network host -v "$PWD/.zap:/zap/wrk:rw" \
+            ghcr.io/zaproxy/zaproxy@sha256:5ccfff9a411743ab2615136a2edd7416bec9ce41572fa94e935df38c14adb2b6 \
+            zap-baseline.py -t http://127.0.0.1:8787 -c rules.tsv -r zap-report.html -J zap-report.json
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: zap-report
+          path: .zap/zap-report.*
+          if-no-files-found: ignore

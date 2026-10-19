@@ -7,6 +7,7 @@ A keyless, free-hosted, Firecrawl-v2-compatible API: **URL → clean Markdown**,
 - **Base URL:** `https://crawler-free.crawler-free.workers.dev`
 - **Source:** https://github.com/artthavv999/crawler-free (MIT, see [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md))
 - **Abuse / opt-out contact:** https://github.com/artthavv999/crawler-free/issues
+- **Security issues:** report privately, see [SECURITY.md](SECURITY.md)
 
 No API key, no sign-up. The official Firecrawl JS SDK works unchanged: `new Firecrawl({ apiKey: "fc-keyless", apiUrl: "https://crawler-free.crawler-free.workers.dev" })`.
 
@@ -23,6 +24,8 @@ No API key, no sign-up. The official Firecrawl JS SDK works unchanged: `new Fire
 | `GET /` | — | The web page (static files in `public/`) |
 
 Unknown fields are accepted, ignored and listed in `warning`. Errors are `{ "success": false, "code": "...", "error": "..." }`.
+
+Call the API from a server, script or terminal. POST and DELETE requests that a browser marks as coming from another website's page are refused with `403 CROSS_SITE_BLOCKED`; SDKs, curl and PowerShell are unaffected. Request bodies over 64 KB get `413 PAYLOAD_TOO_LARGE`.
 
 ```bash
 curl -X POST https://crawler-free.crawler-free.workers.dev/v2/scrape -H "content-type: application/json" -d '{"url":"https://quotes.toscrape.com/","formats":["markdown","links"]}'
@@ -83,5 +86,7 @@ npx wrangler deploy
 Optional JS rendering: `npx wrangler secret put CF_ACCOUNT_ID` and `npx wrangler secret put CF_BROWSER_TOKEN` (API token with "Browser Run - Edit"). Kill switch: set `DISABLED = "1"` in `wrangler.toml` and deploy; every endpoint and queued crawl stops.
 
 Development: `npx tsc --noEmit` and `npx vitest run`. Design notes: [docs/DESIGN.md](docs/DESIGN.md).
+
+Security checks run in GitHub Actions on every push and pull request, and weekly: tests, Gitleaks over the whole history, `npm audit`, CodeQL, a check that the built web page matches its sources, and an OWASP ZAP baseline scan of a local instance. Without a Cloudflare login, tests and `wrangler dev` use `wrangler.ci.toml`, which has no Workers AI binding: `CRAWLER_WRANGLER_CONFIG=./wrangler.ci.toml npx vitest run`. Audit: [docs/security-audit.md](docs/security-audit.md).
 
 Web page: the scripts are written in `ui/` and bundled into `public/` with `npm run build:ui` (esbuild; gsap, lenis and ogl are bundled in, nothing loads from a CDN). The built files are committed, so `wrangler deploy` needs no build step. Redesign notes and screenshots: [docs/ui-redesign-notes.md](docs/ui-redesign-notes.md), [docs/screenshots/](docs/screenshots/).

@@ -85,12 +85,8 @@ export async function safeFetch(raw: string, selfHost: string, onHop?: (u: URL) 
         continue;
       }
       if (+(res.headers.get("content-length") ?? 0) > MAX_BYTES) throw tooBig();
-      let n = 0;
-      const capped = res.body?.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
-        transform(chunk, ctl) { (n += chunk.byteLength) > MAX_BYTES ? ctl.error(tooBig()) : ctl.enqueue(chunk); },
-      }));
       // shortcut: decoded as UTF-8 regardless of charset; add TextDecoder(charset) if non-UTF-8 sites matter.
-      return { res, url, body: capped ? await new Response(capped).text() : "" };
+      return { res, url, body: await readCapped(res.body, MAX_BYTES, tooBig) };
     }
   } catch (e) {
     if (e instanceof ApiError) throw e;
@@ -101,3 +97,14 @@ export async function safeFetch(raw: string, selfHost: string, onHop?: (u: URL) 
 }
 
 const tooBig = () => new ApiError(500, "SCRAPE_FAILED", `page larger than ${MAX_BYTES / 1024 / 1024} MB`);
+
+// Reads a body as text and stops with `tooBig()` once it passes `max` bytes. Declared lengths can't be trusted:
+// chunked bodies don't declare one. Used for fetched pages and for API request bodies.
+export async function readCapped(body: ReadableStream<Uint8Array> | null, max: number, tooBig: () => Error): Promise<string> {
+  if (!body) return "";
+  let n = 0;
+  const capped = body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
+    transform(chunk, ctl) { (n += chunk.byteLength) > max ? ctl.error(tooBig()) : ctl.enqueue(chunk); },
+  }));
+  return new Response(capped).text().catch((e) => { throw n > max ? tooBig() : e; });
+}

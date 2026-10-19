@@ -1,5 +1,5 @@
 import { crawlPage, crawlStatus, startCrawl, type CrawlMsg } from "./crawl";
-import { ApiError } from "./guard";
+import { ApiError, readCapped } from "./guard";
 import { clientKey, rateLimit } from "./limits";
 import { scrape, type Formats } from "./scrape";
 import { asText, createSetup, loadSetup, runSetup, SETUP_TTL } from "./setups";
@@ -14,6 +14,29 @@ export interface Env {
 }
 
 const SILENT = ["origin", "integration"]; // the Firecrawl SDK injects `origin` into every POST
+const MAX_BODY = 64 * 1024; // the largest valid body (10,000-character schema + 2,000-character prompt) is far smaller
+
+// Added to every Worker response (static files get theirs from public/_headers). API output is data, never a page:
+// no MIME sniffing, no framing, and nothing loads or runs if a browser opens it (e.g. /run/{id} page text).
+const SECURITY_HEADERS: Record<string, string> = {
+  "x-content-type-options": "nosniff",
+  "content-security-policy": "default-src 'none'; frame-ancestors 'none'; sandbox",
+  "referrer-policy": "no-referrer",
+  "cross-origin-resource-policy": "same-origin",
+  "cache-control": "no-store", // results and crawl status are never kept by browsers or proxies (the D1 cache is separate)
+};
+
+// Browsers label requests with where they came from; SDKs, curl and PowerShell send neither header. Cross-site
+// "simple" requests (text/plain bodies) skip CORS preflight, so without this check any website could make its
+// visitors' browsers start scrapes and crawls, spending their limits and the shared daily budgets.
+function fromOtherSite(req: Request, origin: string): boolean {
+  const site = req.headers.get("sec-fetch-site");
+  if (site) return site !== "same-origin" && site !== "none";
+  const from = req.headers.get("origin");
+  return from !== null && from !== origin;
+}
+
+const tooLarge = () => new ApiError(413, "PAYLOAD_TOO_LARGE", `request body is larger than ${MAX_BODY / 1024} KB`);
 
 const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
   // explicit charset: Windows PowerShell 5.1 decodes JSON without one as Latin-1 (“ became â€œ)
@@ -47,7 +70,8 @@ function clamp(raw: unknown, dflt: number, min: number, max: number, name: strin
 
 // Unknown fields are accepted, ignored and reported (Firecrawl itself rejects them).
 async function readBody(req: Request, known: string[], warn: string[]): Promise<Record<string, unknown> & { url: string }> {
-  const body = await req.json().catch(() => null);
+  const text = await readCapped(req.body, MAX_BODY, tooLarge); // also caps chunked bodies with no content-length
+  const body = (() => { try { return JSON.parse(text) as unknown; } catch { return null; } })();
   if (!body || typeof body !== "object" || Array.isArray(body)) throw new ApiError(400, "BAD_REQUEST", "body must be a JSON object");
   const extra = Object.keys(body).filter((k) => !known.includes(k) && !SILENT.includes(k));
   if (extra.length) warn.push(`ignored unsupported fields: ${extra.join(", ")}`);
@@ -55,63 +79,76 @@ async function readBody(req: Request, known: string[], warn: string[]): Promise<
   return body as Record<string, unknown> & { url: string };
 }
 
+async function handle(req: Request, env: Env): Promise<Response> {
+  try {
+    if (env.DISABLED === "1") throw new ApiError(503, "DISABLED", "Crawler Free is temporarily disabled");
+    const { pathname, hostname: host, origin, searchParams } = new URL(req.url);
+    if (req.method === "POST" || req.method === "DELETE") { // before rate limiting, so refused requests cost nothing
+      if (fromOtherSite(req, origin)) throw new ApiError(403, "CROSS_SITE_BLOCKED", "requests from other websites' pages are not accepted; call the API from a server, script or terminal");
+      if (Number(req.headers.get("content-length") ?? 0) > MAX_BODY) {
+        await req.body?.cancel().catch(() => {}); // tell the sender to stop instead of leaving its upload hanging
+        throw tooLarge();
+      }
+    }
+    const client = clientKey(req.headers.get("cf-connecting-ip") ?? "unknown");
+    if (req.method === "POST" && pathname === "/v2/scrape") {
+      await rateLimit(env.DB, "scrape", client, 20, 60);
+      const warn: string[] = [];
+      const body = await readBody(req, ["url", "formats"], warn);
+      const f = parseFormats(body.formats, warn);
+      const { doc, hit } = await scrape(env, body.url, f, host, client);
+      if (warn.length) doc.warning = warn.join("; ");
+      return json(200, { success: true, data: doc }, { "x-cache": hit ? "HIT" : "MISS" });
+    }
+    if (req.method === "POST" && pathname === "/v2/crawl") {
+      // shortcut: no Turnstile gate on crawl/json yet, only per-IP (IPv6 /64) limits; add a Turnstile-minted token
+      // if distributed abuse drains the daily Queue/AI budgets.
+      await rateLimit(env.DB, "crawl", client, 5, 86400);
+      const warn: string[] = [];
+      const body = await readBody(req, ["url", "limit", "maxDiscoveryDepth", "scrapeOptions"], warn);
+      const so = (body.scrapeOptions ?? {}) as Record<string, unknown>;
+      const extra = Object.keys(so).filter((k) => k !== "formats");
+      if (extra.length) warn.push(`ignored unsupported scrapeOptions: ${extra.join(", ")}`);
+      const lim = clamp(body.limit, 10, 1, 100, "limit", warn), depth = clamp(body.maxDiscoveryDepth, 2, 0, 3, "maxDiscoveryDepth", warn);
+      const started = await startCrawl(env, body.url, lim, depth, parseFormats(so.formats, warn, false), host, origin);
+      return json(200, { ...started, ...(warn.length && { warning: warn.join("; ") }) });
+    }
+    if (req.method === "POST" && pathname === "/v2/setups") {
+      await rateLimit(env.DB, "setup", client, 20, 86400);
+      const warn: string[] = [];
+      const body = await readBody(req, ["url", "mode", "fields"], warn);
+      return json(200, { ...(await createSetup(env, body, host, origin)), ...(warn.length && { warning: warn.join("; ") }) });
+    }
+    const [, kind, sid] = pathname.match(/^\/(run|v2\/setups)\/([a-z0-9]{10})$/) ?? [];
+    if (sid && kind === "v2/setups" && req.method === "DELETE") {
+      await env.DB.prepare("DELETE FROM setups WHERE id = ?").bind(sid).run();
+      return json(200, { success: true });
+    }
+    if (sid && kind === "run" && req.method === "GET") { // one-step re-run of a saved setup; same limits as a scrape
+      await rateLimit(env.DB, "scrape", client, 20, 60);
+      const s = await loadSetup(env, sid);
+      const { doc, hit } = await runSetup(env, s, host, client);
+      const headers = { "x-cache": hit ? "HIT" : "MISS" };
+      if (searchParams.get("format") === "json") return json(200, { success: true, data: doc }, headers);
+      return new Response(asText(doc, s.mode), { headers: { "content-type": "text/plain; charset=utf-8", ...headers } });
+    }
+    const id = pathname.startsWith("/v2/crawl/") ? pathname.slice(10) : "";
+    // shortcut: status polls are not rate limited (the SDK polls every 2 s); Workers' 100k requests/day is the cap.
+    // Add a per-IP limit if polling dominates the daily request count.
+    if (req.method === "GET" && /^[0-9a-f-]{36}$/.test(id)) return json(200, await crawlStatus(env, id, Math.max(0, parseInt(searchParams.get("skip") ?? "0") || 0), origin));
+    throw new ApiError(404, "NOT_FOUND", `no route ${req.method} ${pathname}`);
+  } catch (e) {
+    if (!(e instanceof ApiError)) console.error(e);
+    const err = e instanceof ApiError ? e : new ApiError(500, "UNKNOWN_ERROR", "internal error");
+    return json(err.status, { success: false, code: err.code, error: err.message }, err.headers);
+  }
+}
+
 export default {
   async fetch(req, env): Promise<Response> {
-    try {
-      if (env.DISABLED === "1") throw new ApiError(503, "DISABLED", "Crawler Free is temporarily disabled");
-      const { pathname, hostname: host, origin, searchParams } = new URL(req.url);
-      const client = clientKey(req.headers.get("cf-connecting-ip") ?? "unknown");
-      if (req.method === "POST" && pathname === "/v2/scrape") {
-        await rateLimit(env.DB, "scrape", client, 20, 60);
-        const warn: string[] = [];
-        const body = await readBody(req, ["url", "formats"], warn);
-        const f = parseFormats(body.formats, warn);
-        const { doc, hit } = await scrape(env, body.url, f, host, client);
-        if (warn.length) doc.warning = warn.join("; ");
-        return json(200, { success: true, data: doc }, { "x-cache": hit ? "HIT" : "MISS" });
-      }
-      if (req.method === "POST" && pathname === "/v2/crawl") {
-        // shortcut: no Turnstile gate on crawl/json yet, only per-IP (IPv6 /64) limits; add a Turnstile-minted token
-        // if distributed abuse drains the daily Queue/AI budgets.
-        await rateLimit(env.DB, "crawl", client, 5, 86400);
-        const warn: string[] = [];
-        const body = await readBody(req, ["url", "limit", "maxDiscoveryDepth", "scrapeOptions"], warn);
-        const so = (body.scrapeOptions ?? {}) as Record<string, unknown>;
-        const extra = Object.keys(so).filter((k) => k !== "formats");
-        if (extra.length) warn.push(`ignored unsupported scrapeOptions: ${extra.join(", ")}`);
-        const lim = clamp(body.limit, 10, 1, 100, "limit", warn), depth = clamp(body.maxDiscoveryDepth, 2, 0, 3, "maxDiscoveryDepth", warn);
-        const started = await startCrawl(env, body.url, lim, depth, parseFormats(so.formats, warn, false), host, origin);
-        return json(200, { ...started, ...(warn.length && { warning: warn.join("; ") }) });
-      }
-      if (req.method === "POST" && pathname === "/v2/setups") {
-        await rateLimit(env.DB, "setup", client, 20, 86400);
-        const warn: string[] = [];
-        const body = await readBody(req, ["url", "mode", "fields"], warn);
-        return json(200, { ...(await createSetup(env, body, host, origin)), ...(warn.length && { warning: warn.join("; ") }) });
-      }
-      const [, kind, sid] = pathname.match(/^\/(run|v2\/setups)\/([a-z0-9]{10})$/) ?? [];
-      if (sid && kind === "v2/setups" && req.method === "DELETE") {
-        await env.DB.prepare("DELETE FROM setups WHERE id = ?").bind(sid).run();
-        return json(200, { success: true });
-      }
-      if (sid && kind === "run" && req.method === "GET") { // one-step re-run of a saved setup; same limits as a scrape
-        await rateLimit(env.DB, "scrape", client, 20, 60);
-        const s = await loadSetup(env, sid);
-        const { doc, hit } = await runSetup(env, s, host, client);
-        const headers = { "x-cache": hit ? "HIT" : "MISS" };
-        if (searchParams.get("format") === "json") return json(200, { success: true, data: doc }, headers);
-        return new Response(asText(doc, s.mode), { headers: { "content-type": "text/plain; charset=utf-8", ...headers } });
-      }
-      const id = pathname.startsWith("/v2/crawl/") ? pathname.slice(10) : "";
-      // shortcut: status polls are not rate limited (the SDK polls every 2 s); Workers' 100k requests/day is the cap.
-      // Add a per-IP limit if polling dominates the daily request count.
-      if (req.method === "GET" && /^[0-9a-f-]{36}$/.test(id)) return json(200, await crawlStatus(env, id, Math.max(0, parseInt(searchParams.get("skip") ?? "0") || 0), origin));
-      throw new ApiError(404, "NOT_FOUND", `no route ${req.method} ${pathname}`);
-    } catch (e) {
-      if (!(e instanceof ApiError)) console.error(e);
-      const err = e instanceof ApiError ? e : new ApiError(500, "UNKNOWN_ERROR", "internal error");
-      return json(err.status, { success: false, code: err.code, error: err.message }, err.headers);
-    }
+    const res = await handle(req, env);
+    for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.headers.set(k, v);
+    return res;
   },
 
   async queue(batch, env) {

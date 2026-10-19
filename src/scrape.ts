@@ -127,8 +127,9 @@ async function render(env: Env, url: URL): Promise<string> {
   }
   const j = (await r.json().catch(() => ({}))) as { success?: boolean; result?: unknown; errors?: { code?: number; message?: string }[] };
   if (!j.success || typeof j.result !== "string") {
-    const why = j.errors?.map((e) => `${e.code}: ${e.message}`).join("; ").slice(0, 200) ?? "";
-    throw new ApiError(500, "SCRAPE_FAILED", `browser rendering failed (${r.status}${why && ` ${why}`})`);
+    // Cloudflare's reason goes to the Worker logs only: it can reveal account or token setup, which callers don't need.
+    console.error("browser run failed", r.status, j.errors?.map((e) => `${e.code}: ${e.message}`).join("; ").slice(0, 200) ?? "");
+    throw new ApiError(500, "SCRAPE_FAILED", `browser rendering failed (HTTP ${r.status})`);
   }
   return j.result;
 }

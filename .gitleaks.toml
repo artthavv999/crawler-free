@@ -1,0 +1,14 @@
+# Gitleaks: the default rules, plus the few allowances this repository needs. Run in CI on every push and pull request
+# (.github/workflows/security.yml) over the full git history.
+title = "Crawler Free"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Documented placeholder API key for the Firecrawl SDK (Crawler Free needs no key)"
+regexes = ['''fc-keyless''']
+
+[[allowlists]]
+description = "Dependencies, local state, git-ignored reference clones and binary assets (local directory scans only)"
+paths = ['''(^|/)node_modules/''', '''(^|/)\.wrangler/''', '''(^|/)_ref/''', '''(^|/)docs/screenshots/''', '''(^|/)public/fonts/.*\.woff2$''']

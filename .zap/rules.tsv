@@ -1,0 +1,2 @@
+10031	IGNORE	(User Controllable HTML Element Attribute: false positive. ZAP submits the reader form as GET /?mode=text and finds "text" in the radio button's own static value attribute; the page is a static file and never reflects query parameters.)
+10049	IGNORE	(Storable and Cacheable Content: public static files revalidate on every load with max-age=0; API responses send Cache-Control: no-store.)

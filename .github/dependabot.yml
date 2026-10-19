@@ -1,0 +1,18 @@
+# Weekly update pull requests for npm packages and for the pinned GitHub Actions. Security-fix pull requests also need
+# "Dependabot security updates" switched on in the repository settings (Settings > Code security).
+# After merging an update to gsap, lenis, ogl or esbuild, run `npm run build:ui` and commit public/ (CI checks this).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      dev-tooling:
+        dependency-type: development
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

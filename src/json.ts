@@ -31,7 +31,8 @@ export async function extractJson(env: Env, markdown: string, f: JsonFormat): Pr
     } catch (e) {
       const msg = String((e as Error).message ?? e);
       if (/4006|neuron|daily free allocation/i.test(msg)) throw new ApiError(503, "EXTRACT_BUDGET_EXHAUSTED", "the free daily AI budget is used up; retry after 00:00 UTC");
-      throw new ApiError(500, "EXTRACT_FAILED", `model error: ${msg.slice(0, 200)}`);
+      console.error("workers ai failed", msg.slice(0, 500)); // details stay in the Worker logs
+      throw new ApiError(500, "EXTRACT_FAILED", "the AI model returned an error; try again later");
     }
     let value = out.response;
     if (typeof value === "string") try { value = JSON.parse(value); } catch { value = null; }

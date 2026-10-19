@@ -1,0 +1,29 @@
+# Copy of wrangler.toml for CI tests and the local ZAP scan. Never deployed (a different name, so even a mistaken
+# `wrangler deploy -c wrangler.ci.toml` can't replace production). It has no Workers AI binding, because that always
+# needs a Cloudflare login, and a placeholder D1 id, because tests and `wrangler dev` use a local D1.
+# Keep everything else in sync with wrangler.toml.
+name = "crawler-free-ci"
+main = "src/index.ts"
+compatibility_date = "2026-08-15"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+[assets]
+directory = "./public"
+
+[vars]
+DISABLED = "0"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "crawler-free"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+[[queues.producers]]
+binding = "QUEUE"
+queue = "crawler-free"
+
+[[queues.consumers]]
+queue = "crawler-free"
+max_batch_size = 1
+max_retries = 6
