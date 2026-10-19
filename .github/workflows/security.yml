@@ -33,6 +33,35 @@ jobs:
           # no Workers AI binding: it needs a Cloudflare login, which CI deliberately doesn't have
           CRAWLER_WRANGLER_CONFIG: ./wrangler.ci.toml
 
+  cli:
+    name: CLI on Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [22, 24] # cli/package.json engines: >=22
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck:cli
+      - run: npm run test:cli
+      - run: npm run build:cli
+      - name: The built command runs, and the package holds only the built file
+        run: |
+          node cli/dist/crawler-free.mjs --version
+          node cli/dist/crawler-free.mjs --help > /dev/null
+          cd cli && npm pack --dry-run --json | node -e "
+            let s = ''; process.stdin.on('data', (d) => (s += d)).on('end', () => {
+              const files = JSON.parse(s)[0].files.map((f) => f.path).sort();
+              console.log(files.join('\n'));
+              if (JSON.stringify(files) !== JSON.stringify(['dist/crawler-free.mjs', 'package.json'])) process.exit(1);
+            });"
+
   secrets:
     name: Gitleaks (whole git history)
     runs-on: ubuntu-latest

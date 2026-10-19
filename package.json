@@ -8,7 +8,10 @@
     "deploy": "wrangler deploy",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "build:ui": "node ui/build.mjs"
+    "build:ui": "node ui/build.mjs",
+    "typecheck:cli": "tsc -p cli",
+    "test:cli": "vitest run --config cli/vitest.config.ts",
+    "build:cli": "node cli/build.mjs"
   },
   "dependencies": {
     "robots-parser": "3.0.1"

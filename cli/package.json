@@ -1,0 +1,24 @@
+{
+  "name": "crawler-free",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Command line for Crawler Free: read web pages as clean Markdown, links or facts through the free hosted service.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "crawler-free": "dist/crawler-free.mjs"
+  },
+  "files": [
+    "dist/crawler-free.mjs"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/artthavv999/crawler-free.git",
+    "directory": "cli"
+  },
+  "homepage": "https://github.com/artthavv999/crawler-free#readme",
+  "bugs": "https://github.com/artthavv999/crawler-free/issues"
+}
