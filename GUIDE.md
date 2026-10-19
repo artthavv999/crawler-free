@@ -242,6 +242,7 @@ Every error has a `code` that says what happened:
 | `RENDER_BUSY` | The page needs JavaScript and the free browser is busy (it reads one such page every 10 seconds) | Try again in a few seconds. Crawls retry these pages by themselves |
 | `RENDER_BUDGET_EXHAUSTED` | The page needs JavaScript and today's free browser time is used up | Try again after midnight UTC |
 | `EXTRACT_BUDGET_EXHAUSTED` | Today's free AI budget (Step 5) is used up | Try again after midnight UTC |
+| `DAILY_BUDGET_EXHAUSTED` | Everyone together has used today's shared allowance of page reads or crawled pages | Try again after midnight UTC (the message says how long) |
 | `EXTRACT_FAILED` | The AI couldn't find all the fields you asked for | Use fields that really appear on the page, or add a `prompt` |
 | `NOT_FOUND` | That crawl is older than 24 hours, or that saved setup was removed or unused for 30 days | Start a new crawl, or save the setup again |
 | `DISABLED` | The service is switched off for maintenance | Try again later |
@@ -260,12 +261,16 @@ These are per internet connection:
 
 | What | Limit |
 |---|---|
-| Reading pages, including running saved setups | 20 per minute |
-| Pulling out facts (Step 5) | 20 per 24 hours; answers saved from the last hour don't count |
-| Crawls / whole-website reads (Step 6) | 5 per 24 hours, up to 100 pages each |
+| Reading pages, including running saved setups | 20 per minute, and 1,000 per 24 hours |
+| Pulling out facts (Step 5) | 20 per 24 hours; answers saved from the last hour don't count. Everyone on your network together: 60 per 24 hours |
+| Crawls / whole-website reads (Step 6) | 5 per 24 hours, up to 100 pages each. Everyone on your network together: 10 per 24 hours |
 | Saving new setups | 20 per 24 hours |
 
 The 24 hours start with your first request, not at midnight. For example, if your first crawl is at 9:00 and you use all 5, you can crawl again at 9:00 the next day.
+
+"Your network" means addresses close to yours (the same IPv4 /24 or IPv6 /48 block), such as other devices at the same office or school.
+
+Two allowances are shared by everyone and reset at midnight UTC: 15,000 page reads and 2,500 crawled pages per day. They keep the free service running for everybody; if one runs out, you'll see `DAILY_BUDGET_EXHAUSTED` until midnight UTC.
 
 Asking for the same page again within an hour is answered instantly from memory.
 

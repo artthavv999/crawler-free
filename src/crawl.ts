@@ -1,4 +1,5 @@
 import { ApiError, checkUrl, normUrl, safeFetch, UA } from "./guard";
+import { addShared, SHARED, sharedKey } from "./limits";
 import { assertAllowed, robotsFor } from "./robots";
 import { fitsRow, scrape, type Formats } from "./scrape";
 import type { Env } from "./index";
@@ -11,14 +12,19 @@ const PAGE_SIZE = 10;
 const MAX_MARKDOWN = 200_000; // chars per stored page; fitsRow() is the hard 2 MB guard
 
 // One statement (D1 allows 50 queries and 100 bound params per invocation): keeps only URLs this job hasn't seen,
-// up to the job's page limit. Depth is discovery hops from the seed, as in Firecrawl.
+// up to the job's page limit and to what is left of today's shared crawl-page budget. Depth is discovery hops from
+// the seed, as in Firecrawl. Pages are charged as they are queued, so a crawl that finds 1 page costs 1, not its limit.
+// shortcut: two claims racing near the end of the budget can overshoot it by a few pages; fine for a budget this size.
 export async function claim(env: Env, job: Job, urls: string[], depth: number): Promise<string[]> {
   if (!urls.length) return [];
   const { results } = await env.DB.prepare(
     `INSERT OR IGNORE INTO pages (job, url, depth) SELECT ?1, value, ?2 FROM json_each(?3)
      WHERE value NOT IN (SELECT url FROM pages WHERE job = ?1)
-     LIMIT max(0, ?4 - (SELECT COUNT(*) FROM pages WHERE job = ?1)) RETURNING url`,
-  ).bind(job.id, depth, JSON.stringify([...new Set(urls)]), job.lim).all<{ url: string }>();
+     LIMIT max(0, min(?4 - (SELECT COUNT(*) FROM pages WHERE job = ?1),
+                      ?5 - coalesce((SELECT n FROM counters WHERE k = ?6 AND reset > ?7), 0))) RETURNING url`,
+  ).bind(job.id, depth, JSON.stringify([...new Set(urls)]), job.lim, SHARED.crawlPages, sharedKey("crawl-pages"), Math.floor(Date.now() / 1000))
+    .all<{ url: string }>();
+  if (results.length) await addShared(env.DB, "crawl-pages", results.length);
   return results.map((r) => r.url);
 }
 

@@ -29,7 +29,7 @@ brief). Protection relies on per-connection rate limits, the SSRF guard and robo
 | # | Severity | Finding | Evidence | Status |
 |---|---|---|---|---|
 | F1 | **Medium** | Other websites can make visitors' browsers call the API (cross-site "simple" requests) | `src/index.ts` `readBody` parses any body with `req.json()` whatever its content type, and nothing checks `Origin`/`Sec-Fetch-Site`. Local repro: `POST /v2/setups` with `content-type: text/plain`, `Origin: https://evil.example`, `Sec-Fetch-Site: cross-site` returned **200** and created a setup. | Fixed |
-| F2 | **Medium** | Shared free daily budgets can be drained by many IPs | Limits are per IPv4 address or IPv6 /64 only (`src/limits.ts`; `src/index.ts` notes "no Turnstile gate"). One IPv6 /48 holds 65,536 /64s. The AI neurons, browser minutes, queue operations and 100k requests per day are shared by all users, so draining them is a denial of service for everyone. | Needs your approval |
+| F2 | **Medium** | Shared free daily budgets can be drained by many IPs, or by one script staying within its limits | Limits are per IPv4 address or IPv6 /64 only (`src/limits.ts`; `src/index.ts` notes "no Turnstile gate"). One IPv6 /48 holds 65,536 /64s. The AI neurons, browser minutes, queue operations and 100k requests per day are shared by all users, so draining them is a denial of service for everyone. Worst case: one script within its 20/minute limit could make 28,800 page reads a day, about 70,000 D1 writes, close to the 100k free writes. Once D1 writes run out, every request fails. | Fixed (approved 2026-10-19), except raw request floods ([below](#f2-what-was-implemented-approved-2026-10-19)) |
 | F3 | Low | No request body size limit | `readBody` reads the whole body before validating. Local repro: a 3 MB JSON body was fully parsed, then rejected with 400 "url is required". Bounded only by platform limits (10 ms CPU, 128 MB). | Fixed |
 | F4 | Low | API responses carry no security headers | Live: `GET /v2/nothing` returns only `Content-Type`. `public/_headers` covers static files only. `/run/{id}` returns third-party page text as `text/plain` without `nosniff`. | Fixed |
 | F5 | Low | Anyone holding a setup's run link can delete it | `src/index.ts` `DELETE /v2/setups/{id}` has no ownership check, and the ID is the same one in the shareable `/run/{id}` link. Local repro: DELETE returned 200, then run returned 404. IDs can't be guessed or enumerated, and setups hold only an address and settings. | Needs your approval (schema change) |
@@ -81,8 +81,8 @@ Every GitHub Action is pinned to a full commit SHA, and each container image to 
 | Check | Command | Result |
 |---|---|---|
 | Typecheck | `npx tsc --noEmit` | **Passed** |
-| Tests (with Cloudflare login) | `npx vitest run` | **Passed**: 18/18 (11 existing, 7 new) |
-| Tests (no credentials, as CI runs them) | `CRAWLER_WRANGLER_CONFIG=./wrangler.ci.toml npx vitest run` with an empty Wrangler config dir | **Passed**: 18/18 |
+| Tests (with Cloudflare login) | `npx vitest run` | **Passed**: 27/27 (11 existing, 7 security, 9 limits for F2) |
+| Tests (no credentials, as CI runs them) | `CRAWLER_WRANGLER_CONFIG=./wrangler.ci.toml npx vitest run` with an empty Wrangler config dir | **Passed**: 27/27 |
 | Secrets, git history | Gitleaks v8.30.1 (`gitleaks git`, container pinned by digest) | **Passed**: 17 commits, no leaks |
 | Secrets, working tree | Gitleaks `dir` | 33 findings, **all in `_ref/`** (git-ignored third-party clones, placeholder keys in their `.env.example` files); now allow-listed. 0 in this project's files. |
 | Secrets, files changed after that run | Pattern scan (keyword plus token, private keys, GitHub/AWS keys, 32-hex IDs) over 45 new or changed files | **Passed**: 0 matches |
@@ -95,12 +95,28 @@ Every GitHub Action is pinned to a full commit SHA, and each container image to 
 | Gitleaks re-run after the last doc edits | — | **Not run**: Docker stopped. The pattern scan above covered those files. |
 | Production | — | **Not scanned** (by design). The security changes are **not deployed yet** |
 
+## F2: what was implemented (approved 2026-10-19)
+
+| Budget (free per day) | Before | Now |
+|---|---|---|
+| D1 rows written: 100,000 | Each page read costs about 2–5 rows; each refused request also cost 1 row; no daily cap per connection | **1,000 page reads per connection per 24 h** (on top of 20 a minute); **15,000 page reads a day for everyone** (`503 DAILY_BUDGET_EXHAUSTED` until 00:00 UTC); refused requests write **0 rows**, measured with D1's own `rows_written` (a new counter writes 2, a counted request 1, a refusal 0), and refusals already seen in an isolate skip D1 entirely |
+| Queue operations: 10,000 | 7 IPs × 5 crawls × 100 pages filled it | **2,500 crawled pages a day for everyone**, charged as pages are queued (a 1-page crawl costs 1). New crawls are refused with 503 once it's used up; running crawls stop adding pages. **10 crawls a day per network** (IPv4 /24 or IPv6 /48) |
+| Workers AI: 10,000 units | 17–40 units per fresh look-up (about 250–580 a day); 13–29 IPs, or one IPv6 /48, drained it | **60 fact look-ups a day per network** (IPv4 /24 or IPv6 /48), on top of 20 per connection |
+| Worker requests: 100,000 | Every call counts, including refused ones | **Unchanged; this can't be fixed in code on the free plan** (see below) |
+
+Code:
+- `src/limits.ts`: `subnetKey`, conditional upserts, `spendShared`/`sharedLeft`/`addShared`, and per-isolate memory of refusals.
+- `src/index.ts`: `pageRead` and the crawl route.
+- `src/crawl.ts`: `claim` charges the shared crawl budget.
+- `src/scrape.ts`: the network limit on fact look-ups.
+
+No schema change: the existing `counters` table holds the new keys, and the hourly cron already deletes expired rows. Tests: `test/limits.test.ts` (9 tests).
+
+**Still open (needs money or infrastructure, so your call):** a raw flood of requests, about 1.2 per second sustained for a day from any single client, uses up the 100,000 Worker requests even when every request is refused. Only edge rate limiting stops that. The options are a custom domain with Cloudflare's free rate-limiting rule (about $10 a year for the domain; the free rule only blocks for 10 s at a time) or Workers Paid ($5 a month, no daily request cap, usage billing). Turnstile wasn't used: API clients can't solve it, and an attacker would call the API directly.
+
 ## Remaining findings that need your decision
 
-1. **F2: protect the shared daily budgets from many-IP abuse.** Options, cheapest first:
-   - A global daily cap per feature (for example, stop starting crawls after N per day across everyone). This needs a small code change but no schema change, and it protects other users at the cost of turning everyone away once the cap is reached.
-   - Cloudflare Turnstile on the web page for whole-website reads and fact look-ups. This needs a Turnstile site key (a Cloudflare dashboard change) and a secret.
-   - A WAF rate-limiting rule. This needs a custom domain; `*.workers.dev` has no WAF rules.
+1. **F2, raw request floods:** a custom domain with a rate-limiting rule, or Workers Paid; see above. The rest of F2 is fixed.
 2. **F5: a delete key for saved setups.** Return a separate secret at creation, store only its hash in a new `setups` column, and require it on DELETE; existing setups would stay deletable by ID until they expire. This is a schema change.
 3. **GitHub repository settings** (I can't change these from here, and they need your OK in any case):
    - Settings → Code security: turn on **Private vulnerability reporting** (SECURITY.md points to it), **Dependabot alerts**, **Dependabot security updates**, and **Secret scanning** with **Push protection**.

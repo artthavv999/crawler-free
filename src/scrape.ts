@@ -1,6 +1,6 @@
 import { ApiError, checkUrl, normUrl, safeFetch, UA } from "./guard";
 import { extractJson, type JsonFormat } from "./json";
-import { rateLimit } from "./limits";
+import { rateLimit, subnetKey } from "./limits";
 import { assertAllowed } from "./robots";
 import type { Env } from "./index";
 
@@ -142,7 +142,10 @@ export async function scrape(env: Env, rawUrl: string, f: Formats, selfHost: str
   const now = Math.floor(Date.now() / 1000);
   const cached = await env.DB.prepare("SELECT body FROM cache WHERE k = ? AND expires > ?").bind(key, now).first<string>("body");
   if (cached) return { doc: JSON.parse(cached), hit: true };
-  if (f.json) await rateLimit(env.DB, "json", client, 20, 86400);
+  if (f.json) { // 20 a day per connection, 60 per network (IPv4 /24, IPv6 /48): the AI budget is shared by everyone
+    await rateLimit(env.DB, "json", client, 20, 86400);
+    await rateLimit(env.DB, "json-net", subnetKey(client), 60, 86400);
+  }
 
   const { res, url, body } = await safeFetch(rawUrl, selfHost, (u) => assertAllowed(env.DB, u, selfHost));
   if ([401, 402, 403, 429].includes(res.status) || res.headers.get("cf-mitigated") === "challenge") {

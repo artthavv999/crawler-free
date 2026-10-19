@@ -161,7 +161,7 @@
               <ul class="facts">
                 <li>Read from the page itself</li>
                 <li>Shown together with the page's text, in its own tab</li>
-                <li>Same limit as a page read: 20 a minute</li>
+                <li>Same limit as a page read: 20 a minute, 1,000 a day</li>
               </ul>
               <button type="button" class="ghost try" data-mode="links">Try it</button>
             </div>
@@ -334,7 +334,7 @@ print(res.json()["data"]["markdown"])</code></pre>
           </div>
           <div class="acc-item">
             <h3><button type="button" class="acc-btn" id="q2" aria-expanded="false" aria-controls="a2">What are the limits?</button></h3>
-            <div class="acc-panel" id="a2" role="region" aria-labelledby="q2"><div><p>Per connection (one IPv4 address, or one IPv6 /64): 20 page reads a minute, plus 20 fact look-ups, 5 whole-website reads and 20 new saved setups per 24 hours. A whole-website read covers up to 100 pages. When you hit a limit, the message says how long to wait.</p></div></div>
+            <div class="acc-panel" id="a2" role="region" aria-labelledby="q2"><div><p>Per connection (one IPv4 address, or one IPv6 /64): 20 page reads a minute and 1,000 a day, plus 20 fact look-ups, 5 whole-website reads and 20 new saved setups per 24 hours. Your whole network shares 60 fact look-ups and 10 whole-website reads a day. Everyone together shares 15,000 page reads and 2,500 crawled pages a day, reset at 00:00 UTC. When you hit a limit, the message says how long to wait.</p></div></div>
           </div>
           <div class="acc-item">
             <h3><button type="button" class="acc-btn" id="q3" aria-expanded="false" aria-controls="a3">Will it read any website?</button></h3>

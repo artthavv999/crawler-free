@@ -1,6 +1,6 @@
 import { crawlPage, crawlStatus, startCrawl, type CrawlMsg } from "./crawl";
 import { ApiError, readCapped } from "./guard";
-import { clientKey, rateLimit } from "./limits";
+import { assertShared, clientKey, rateLimit, SHARED, sharedLeft, spendShared, subnetKey } from "./limits";
 import { scrape, type Formats } from "./scrape";
 import { asText, createSetup, loadSetup, runSetup, SETUP_TTL } from "./setups";
 
@@ -34,6 +34,15 @@ function fromOtherSite(req: Request, origin: string): boolean {
   if (site) return site !== "same-origin" && site !== "none";
   const from = req.headers.get("origin");
   return from !== null && from !== origin;
+}
+
+// Every page read (scrape or saved-setup run): per connection 20 a minute and 1,000 a day, then one unit of the shared
+// daily budget. A shared budget already known to be used up refuses first, before anyone's own allowance is spent.
+async function pageRead(db: D1Database, client: string): Promise<void> {
+  assertShared("page-reads", SHARED.pageReads);
+  await rateLimit(db, "scrape", client, 20, 60);
+  await rateLimit(db, "scrape-day", client, 1000, 86400);
+  await spendShared(db, "page-reads", SHARED.pageReads);
 }
 
 const tooLarge = () => new ApiError(413, "PAYLOAD_TOO_LARGE", `request body is larger than ${MAX_BODY / 1024} KB`);
@@ -92,7 +101,7 @@ async function handle(req: Request, env: Env): Promise<Response> {
     }
     const client = clientKey(req.headers.get("cf-connecting-ip") ?? "unknown");
     if (req.method === "POST" && pathname === "/v2/scrape") {
-      await rateLimit(env.DB, "scrape", client, 20, 60);
+      await pageRead(env.DB, client);
       const warn: string[] = [];
       const body = await readBody(req, ["url", "formats"], warn);
       const f = parseFormats(body.formats, warn);
@@ -101,9 +110,11 @@ async function handle(req: Request, env: Env): Promise<Response> {
       return json(200, { success: true, data: doc }, { "x-cache": hit ? "HIT" : "MISS" });
     }
     if (req.method === "POST" && pathname === "/v2/crawl") {
-      // shortcut: no Turnstile gate on crawl/json yet, only per-IP (IPv6 /64) limits; add a Turnstile-minted token
-      // if distributed abuse drains the daily Queue/AI budgets.
+      // Today's shared crawl-page budget first (a read), then 5 a day per connection and 10 per network (IPv4 /24, IPv6 /48).
+      // Pages are charged to the shared budget as they are queued (claim() in crawl.ts).
+      await sharedLeft(env.DB, "crawl-pages", SHARED.crawlPages);
       await rateLimit(env.DB, "crawl", client, 5, 86400);
+      await rateLimit(env.DB, "crawl-net", subnetKey(client), 10, 86400);
       const warn: string[] = [];
       const body = await readBody(req, ["url", "limit", "maxDiscoveryDepth", "scrapeOptions"], warn);
       const so = (body.scrapeOptions ?? {}) as Record<string, unknown>;
@@ -125,7 +136,7 @@ async function handle(req: Request, env: Env): Promise<Response> {
       return json(200, { success: true });
     }
     if (sid && kind === "run" && req.method === "GET") { // one-step re-run of a saved setup; same limits as a scrape
-      await rateLimit(env.DB, "scrape", client, 20, 60);
+      await pageRead(env.DB, client);
       const s = await loadSetup(env, sid);
       const { doc, hit } = await runSetup(env, s, host, client);
       const headers = { "x-cache": hit ? "HIT" : "MISS" };
