@@ -52,22 +52,7 @@ export async function doctor(o: DoctorOptions): Promise<number> {
     if (!checks.some((c) => c.name === "settings" && !c.ok)) checks.push(failed("service address", e));
   }
 
-  if (apiUrl) {
-    const client = new ApiClient({ baseUrl: apiUrl, timeoutMs: o.timeoutMs, fetch: o.fetch });
-    let reachable = false;
-    try {
-      const started = Date.now();
-      const res = await client.request("/");
-      await res.body?.cancel();
-      reachable = res.status < 500;
-      checks.push(reachable
-        ? { name: "connection", ok: true, detail: `Reached ${apiUrl} (HTTP ${res.status}, ${Date.now() - started} ms; address from ${source})` }
-        : { name: "connection", ok: false, detail: `${apiUrl} answered HTTP ${res.status}.`, hint: "The service may be having trouble; try again in a few minutes.", exitCode: EXIT.failed });
-    } catch (e) {
-      checks.push(failed("connection", e));
-    }
-    if (reachable) checks.push(await apiCheck(client));
-  }
+  if (apiUrl) checks.push(...(await serviceChecks(new ApiClient({ baseUrl: apiUrl, timeoutMs: o.timeoutMs, fetch: o.fetch }), source)));
 
   checks.push(await outputCheck(o.cwd));
 
@@ -80,6 +65,24 @@ export async function doctor(o: DoctorOptions): Promise<number> {
     o.ui.out(bad.length ? `${bad.length} check${bad.length > 1 ? "s" : ""} failed.\n` : "All checks passed.\n");
   }
   return bad.length ? (bad[0].exitCode ?? EXIT.failed) : EXIT.ok;
+}
+
+// Can the service be reached, and does it answer like Crawler Free? Used by doctor, and by setup before saving.
+// Neither check starts any work or uses page-read quota.
+export async function serviceChecks(client: ApiClient, source?: string): Promise<Check[]> {
+  const apiUrl = client.baseUrl;
+  try {
+    const started = Date.now();
+    const res = await client.request("/");
+    await res.body?.cancel();
+    if (res.status >= 500) {
+      return [{ name: "connection", ok: false, detail: `${apiUrl} answered HTTP ${res.status}.`, hint: "The service may be having trouble; try again in a few minutes.", exitCode: EXIT.failed }];
+    }
+    const connection: Check = { name: "connection", ok: true, detail: `Reached ${apiUrl} (HTTP ${res.status}, ${Date.now() - started} ms${source ? `; address from ${source}` : ""})` };
+    return [connection, await apiCheck(client)];
+  } catch (e) {
+    return [failed("connection", e)];
+  }
 }
 
 async function apiCheck(client: ApiClient): Promise<Check> {

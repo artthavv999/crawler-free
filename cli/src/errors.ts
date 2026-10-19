@@ -20,16 +20,20 @@ const REFUSED: Record<string, string> = {
   ROBOTS_DISALLOWED: "The site's robots.txt asks crawlers not to read this page, and Crawler Free respects that.",
   BLOCKED: "The site refused the request. Crawler Free never gets around blocks, logins or bot protection.",
 };
-const LIMIT = new Set(["RATE_LIMITED", "DAILY_BUDGET_EXHAUSTED", "EXTRACT_BUDGET_EXHAUSTED", "RENDER_BUDGET_EXHAUSTED", "RENDER_BUSY"]);
+const LIMIT: Record<string, string> = {
+  RATE_LIMITED: "Crawler Free is free and shared, so each connection has limits; they free up on their own, as the message says.",
+  DAILY_BUDGET_EXHAUSTED: "Everyone together has used today's shared budget for this on the free service. It resets at 00:00 UTC.",
+  EXTRACT_BUDGET_EXHAUSTED: "The AI model's free daily budget is shared by everyone and resets at 00:00 UTC. Reading page text (scrape) still works.",
+  RENDER_BUDGET_EXHAUSTED: "Pages that need JavaScript use a small shared daily budget, which resets at 00:00 UTC. Ordinary pages still work.",
+  RENDER_BUSY: "The shared browser for JavaScript pages reads one page every 10 seconds; try again in a moment.",
+};
 
 // An API error ({ success: false, code, error }) as a CLI error. The API's message is already written for people
 // (rate limits say when to try again), so it is shown as is.
 export function fromApi(status: number, code: string, message: string, retryAfter?: number): CliError {
   const text = message || `The server answered HTTP ${status}.`;
-  if (code in REFUSED) return new CliError(text, EXIT.refused, code, REFUSED[code]);
-  if (LIMIT.has(code)) {
-    return new CliError(text, EXIT.limit, code, "Crawler Free is a free service shared by everyone, with daily limits.", retryAfter);
-  }
+  if (Object.hasOwn(REFUSED, code)) return new CliError(text, EXIT.refused, code, REFUSED[code]);
+  if (Object.hasOwn(LIMIT, code)) return new CliError(text, EXIT.limit, code, LIMIT[code], retryAfter);
   if (code === "BAD_REQUEST") return new CliError(text, EXIT.usage, code);
   if (code === "SCRAPE_TIMEOUT") return new CliError(text, EXIT.network, code, "The site took too long to answer. Try again later.");
   return new CliError(text, EXIT.failed, code);

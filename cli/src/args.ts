@@ -19,6 +19,11 @@ export interface Args {
   limit?: string;
   depth?: string;
   maxWait?: string;
+  // extract
+  fields?: string[];
+  // setup
+  hosted: boolean;
+  reset: boolean;
 }
 
 const OPTIONS = {
@@ -35,15 +40,21 @@ const OPTIONS = {
   limit: { type: "string" },
   depth: { type: "string" },
   "max-wait": { type: "string" },
+  fields: { type: "string", multiple: true },
+  hosted: { type: "boolean" },
+  reset: { type: "boolean" },
 } as const;
 
 // Options that only make sense for some commands; anything else rejects them instead of silently ignoring them.
 export const COMMAND_OPTIONS: Record<string, (keyof Args)[]> = {
   scrape: ["format", "output", "stdout", "force"],
   crawl: ["limit", "depth", "maxWait", "output", "force"],
+  extract: ["fields", "output", "stdout", "force"],
+  setup: ["hosted", "reset", "force"],
 };
 const FLAG_NAMES: Partial<Record<keyof Args, string>> = {
   format: "--format", output: "--output", stdout: "--stdout", force: "--force", limit: "--limit", depth: "--depth", maxWait: "--max-wait",
+  fields: "--fields", hosted: "--hosted", reset: "--reset",
 };
 
 export function parse(argv: string[]): Args {
@@ -81,6 +92,9 @@ export function parse(argv: string[]): Args {
     limit: str("limit"),
     depth: str("depth"),
     maxWait: str("max-wait"),
+    fields: Array.isArray(v.fields) ? v.fields : undefined,
+    hosted: v.hosted === true,
+    reset: v.reset === true,
   };
 }
 

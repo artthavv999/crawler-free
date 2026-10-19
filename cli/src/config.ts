@@ -1,9 +1,9 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, rmdir, writeFile } from "node:fs/promises";
 import { posix, win32 } from "node:path";
 import { DEFAULT_API } from "./client";
 import { CliError, EXIT } from "./errors";
 
-// The settings file holds only the service address and the mode; never secrets (docs/cli-plan.md, D8).
+// The settings file holds only the mode and, for your own copy, its address; never secrets (docs/cli-plan.md, D8).
 // The CLI works with no settings file at all: it then uses the hosted service.
 export interface Config { apiUrl: string; mode: "hosted" | "self-hosted" }
 export interface System { platform: string; env: Record<string, string | undefined>; homedir: string }
@@ -46,28 +46,38 @@ export async function readConfig(sys: System): Promise<Config | null> {
   } catch {
     throw new CliError(`The settings file ${path} isn't valid JSON.`, EXIT.usage, "CONFIG_INVALID", reset);
   }
-  const c = raw as { apiUrl?: unknown; mode?: unknown } | null;
-  if (!c || typeof c !== "object" || typeof c.apiUrl !== "string") {
-    throw new CliError(`The settings file ${path} has no service address (apiUrl).`, EXIT.usage, "CONFIG_INVALID", reset);
+  const invalid = (why: string) => new CliError(`The settings file ${path} ${why}.`, EXIT.usage, "CONFIG_INVALID", reset);
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw invalid("isn't a settings object");
+  const c = raw as { apiUrl?: unknown; mode?: unknown };
+  // Hosted: the address built into this version, so a saved choice keeps working if the hosted service ever moves.
+  if (c.mode === "hosted") {
+    if (c.apiUrl !== undefined && c.apiUrl !== DEFAULT_API) throw invalid("says hosted but names another address");
+    return { apiUrl: DEFAULT_API, mode: "hosted" };
   }
+  if (c.mode !== undefined && c.mode !== "self-hosted") throw invalid(`has an unknown mode (use "hosted" or "self-hosted")`);
+  if (typeof c.apiUrl !== "string") throw invalid("has no service address (apiUrl)");
   try {
-    return { apiUrl: checkApiUrl(c.apiUrl), mode: c.mode === "self-hosted" ? "self-hosted" : "hosted" };
+    return { apiUrl: checkApiUrl(c.apiUrl), mode: "self-hosted" };
   } catch (e) {
-    throw new CliError(`The settings file ${path} has an unusable service address: ${(e as Error).message}`, EXIT.usage, "CONFIG_INVALID", reset);
+    throw invalid(`has an unusable service address: ${(e as Error).message}`);
   }
 }
 
+// Saves the choice: { "mode": "hosted" }, or { "mode": "self-hosted", "apiUrl": ... } for your own copy.
 export async function writeConfig(sys: System, config: Config): Promise<string> {
   const path = configPath(sys);
+  const apiUrl = checkApiUrl(config.apiUrl);
+  const clean = config.mode === "hosted" || apiUrl === DEFAULT_API ? { mode: "hosted" } : { mode: "self-hosted", apiUrl };
   await mkdir(pathApi(sys.platform).dirname(path), { recursive: true });
-  const clean: Config = { apiUrl: checkApiUrl(config.apiUrl), mode: config.mode === "self-hosted" ? "self-hosted" : "hosted" };
   await writeFile(path, `${JSON.stringify(clean, null, 2)}\n`, { encoding: "utf8" });
   return path;
 }
 
+// Removes the settings file, and its crawler-free folder when nothing else is in it.
 export async function resetConfig(sys: System): Promise<string> {
   const path = configPath(sys);
   await rm(path, { force: true });
+  await rmdir(pathApi(sys.platform).dirname(path)).catch(() => {}); // not empty or already gone: leave it
   return path;
 }
 

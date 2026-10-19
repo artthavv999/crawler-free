@@ -2,7 +2,7 @@ import type { Args } from "./args";
 import type { ApiClient } from "./client";
 import { CliError, EXIT } from "./errors";
 import { FORMATS, mayReplace, saveFile, targetPath, type Ask, type Format } from "./output";
-import type { Ui } from "./ui";
+import { printable, type Ui } from "./ui";
 
 interface PageData {
   markdown?: unknown;
@@ -50,7 +50,7 @@ function render(format: Format, data: PageData): { content: string; size: string
 // Never retried automatically: every read counts against the shared limits (docs/cli-plan.md, D9).
 export async function scrape(o: { args: Args; client: ApiClient; ui: Ui; cwd: string; ask?: Ask }): Promise<number> {
   const a = o.args;
-  if (a.rest.length > 1) throw usage(`scrape reads one page at a time (got ${a.rest.length} addresses).`, "`crawl` (coming next) reads a whole website.");
+  if (a.rest.length > 1) throw usage(`scrape reads one page at a time (got ${a.rest.length} addresses).`, "`crawl` reads a whole website.");
   const url = pageUrl(a.rest[0]);
   const format = (a.format ?? "markdown") as Format;
   if (!FORMATS.includes(format)) throw usage(`Unknown format "${a.format}". Choose markdown, links or json.`);
@@ -90,7 +90,7 @@ export async function scrape(o: { args: Args; client: ApiClient; ui: Ui; cwd: st
   } else if (o.ui.mode.quiet) {
     o.ui.out(`${path}\n`);
   } else {
-    o.ui.out(`Saved ${LABEL[format]} (${size}${title ? ` from "${title}"` : ""}) to ${path}\n${cached ? "The service answered from its cache (pages are cached for 1 hour).\n" : ""}`);
+    o.ui.out(`Saved ${LABEL[format]} (${size}${title ? ` from "${printable(title, 80)}"` : ""}) to ${path}\n${cached ? "The service answered from its cache (pages are cached for 1 hour).\n" : ""}`);
   }
   return EXIT.ok;
 }

@@ -12,6 +12,7 @@ declare const process: {
   stderr: { write(s: string): boolean; isTTY?: boolean };
   stdin: { isTTY?: boolean };
   cwd(): string;
+  exit(code?: number): never;
 };
 
 declare module "node:util" {
@@ -21,7 +22,7 @@ declare module "node:util" {
     options?: Record<string, ParseArgsOption>;
     allowPositionals?: boolean;
     strict?: boolean;
-  }): { values: Record<string, string | boolean | undefined>; positionals: string[] };
+  }): { values: Record<string, string | boolean | string[] | undefined>; positionals: string[] };
 }
 
 declare module "node:fs/promises" {
@@ -29,13 +30,18 @@ declare module "node:fs/promises" {
   export function writeFile(path: string, data: string, options?: { encoding?: "utf8"; mode?: number; flag?: string }): Promise<void>;
   export function mkdir(path: string, options?: { recursive?: boolean; mode?: number }): Promise<string | undefined>;
   export function rm(path: string, options?: { force?: boolean }): Promise<void>;
+  export function rmdir(path: string): Promise<void>;
   export function access(path: string, mode?: number): Promise<void>;
   export function stat(path: string): Promise<{ isDirectory(): boolean; isFile(): boolean }>;
   export function readdir(path: string): Promise<string[]>;
 }
 
 declare module "node:readline/promises" {
-  export function createInterface(options: { input: unknown; output: unknown }): { question(query: string): Promise<string>; close(): void };
+  export function createInterface(options: { input: unknown; output: unknown }): {
+    question(query: string): Promise<string>;
+    close(): void;
+    on(event: "SIGINT" | "close", listener: () => void): void;
+  };
 }
 
 declare module "node:fs" {

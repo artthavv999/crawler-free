@@ -25,15 +25,10 @@ describe("crawler-free (no command, help, version)", () => {
     expect(none.stderr).toContain("Usage");
   });
 
-  it("explains unknown commands, commands from later phases and bad options (exit 2)", async () => {
+  it("explains unknown commands and bad options (exit 2)", async () => {
     const unknown = await run(["scrapee"]);
     expect(unknown).toMatchObject({ code: EXIT.usage, stdout: "" });
     expect(unknown.stderr).toBe('Error: Unknown command "scrapee".\nRun `crawler-free --help` to see the commands.\n');
-    for (const later of ["extract", "setup"]) {
-      const r = await run([later, "https://example.com"]);
-      expect(r.code).toBe(EXIT.usage);
-      expect(r.stderr).toContain(`"${later}" isn't available in this preview yet.`);
-    }
     const wrongCommand = await run(["doctor", "--format", "links"]);
     expect(wrongCommand.code).toBe(EXIT.usage);
     expect(wrongCommand.stderr).toContain('--format doesn\'t work with "doctor".');

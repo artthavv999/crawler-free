@@ -4,8 +4,10 @@ import { resolveApiUrl } from "./config";
 import { crawl, type Clock } from "./crawl";
 import { doctor } from "./doctor";
 import { CliError, EXIT } from "./errors";
+import { extract } from "./extract";
 import type { Ask } from "./output";
 import { scrape } from "./scrape";
+import { setup } from "./setup";
 import { Ui, type Io } from "./ui";
 import { VERSION } from "./version";
 
@@ -14,12 +16,14 @@ export const HELP = `crawler-free ${VERSION}: read web pages as clean Markdown, 
 Usage
   crawler-free <command> [options]
 
-Commands in this preview
+Commands
   scrape <url>        Read one page and save it as a file
   crawl <url>         Read a whole website, page by page, into a folder
+  extract <url>       Look up facts on a page (for example a title and a price) and save them as JSON
+  setup               Choose the service to use: the free hosted one (the default) or your own copy
   doctor              Check Node.js, your settings, the connection to the service and the results folder
 
-Coming next: extract and setup.
+No setup is needed for the hosted service: every command works straight away.
 
 Examples
   crawler-free scrape https://example.com
@@ -27,6 +31,7 @@ Examples
   crawler-free scrape https://example.com --output notes/example.md
   crawler-free scrape https://example.com --stdout > page.md
   crawler-free crawl https://books.toscrape.com/ --limit 20
+  crawler-free extract https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html --fields title,price
 
 scrape options
   -f, --format <name> markdown (default), links (one per line) or json (text, links and page details)
@@ -42,6 +47,21 @@ crawl options
   --force             Use a folder that already has files, replacing files with the same names
   Saves one .md file per page and pages.json (every page's address, title and file, and any pages that failed).
   Stays on the same site, under the start address's folder, and follows each site's robots.txt.
+
+extract options
+  --fields <names>    The facts to look up, separated by commas: 1 to 20 names (spaces become _), for example title,price
+  -o, --output <path> Save here: a file, or a folder ending in / (default: ./crawler-free-output/<page>.facts.json)
+  --stdout            Print the facts as JSON instead of saving them
+  --force             Replace an existing file without asking
+  Facts are read by a small AI model, so they can be missing or wrong: check anything important against the page.
+
+setup options
+  (none)              Ask which service to use (in a script, with no one to ask, it picks the hosted service)
+  --hosted            Use the free hosted service, without questions
+  --api-url <url>     Use your own copy of Crawler Free at this address, without questions
+  --force             Save even if the connection check fails
+  --reset             Remove the settings file and go back to the hosted service
+  The connection is checked before anything is saved. Only the choice is saved: no keys, tokens or passwords.
 
 Options for every command
   --api-url <url>     Use another Crawler Free server (default: the hosted service)
@@ -60,12 +80,10 @@ Exit codes
   6 results file problem
 
 The hosted service is free and shared, with limits per connection: 20 pages a minute and 1,000 a day,
-5 whole-website reads a day of up to 100 pages each:
+5 whole-website reads a day of up to 100 pages each, and 20 fact look-ups a day:
 https://crawler-free.crawler-free.workers.dev
 Pages are always read by the service, which follows each site's robots.txt; this program never contacts those sites itself.
 `;
-
-const LATER = new Set(["extract", "setup"]);
 
 export interface Deps extends Io {
   argv: string[];
@@ -118,9 +136,15 @@ export async function main(d: Deps): Promise<number> {
       const client = new ApiClient({ baseUrl: url, timeoutMs: a.timeoutMs, fetch: d.fetch });
       return await crawl({ args: a, client, ui, cwd: d.cwd, ask: d.ask, clock: d.clock ?? realClock });
     }
-    if (LATER.has(a.command)) {
-      throw new CliError(`"${a.command}" isn't available in this preview yet.`, EXIT.usage, "NOT_YET",
-        "This version has `scrape`, `crawl` and `doctor`; extract and setup come next.");
+    if (a.command === "extract") {
+      checkOptionsFor("extract", a);
+      const { url } = await resolveApiUrl(a.apiUrl, sys);
+      const client = new ApiClient({ baseUrl: url, timeoutMs: a.timeoutMs, fetch: d.fetch });
+      return await extract({ args: a, client, ui, cwd: d.cwd, ask: d.ask });
+    }
+    if (a.command === "setup") {
+      checkOptionsFor("setup", a);
+      return await setup({ args: a, sys, ui, ask: d.ask, fetch: d.fetch });
     }
     throw new CliError(`Unknown command "${a.command}".`, EXIT.usage, "USAGE", "Run `crawler-free --help` to see the commands.");
   } catch (e) {

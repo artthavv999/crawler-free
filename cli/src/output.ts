@@ -4,7 +4,10 @@ import { CliError, EXIT } from "./errors";
 
 export type Format = "markdown" | "links" | "json";
 export const FORMATS: Format[] = ["markdown", "links", "json"];
-export const EXTENSION: Record<Format, string> = { markdown: "md", links: "txt", json: "json" };
+// What a saved file holds: a scrape format, or facts from extract (".facts.json", so it never takes the name of a
+// scrape --format json file for the same page).
+export type Kind = Format | "facts";
+export const EXTENSION: Record<Kind, string> = { markdown: "md", links: "txt", json: "json", facts: "facts.json" };
 export const OUTPUT_DIR = "crawler-free-output";
 
 export type Ask = (question: string) => Promise<string>;
@@ -20,7 +23,7 @@ function tag(s: string): string {
 // with anything but letters, digits, dot, dash and underscore replaced. It can't contain a path separator or "..",
 // it never ends in a dot or space (Windows), and it always starts with the host, so it can't be a reserved
 // Windows device name such as CON or NUL.
-export function fileNameFor(url: URL, format: Format): string {
+export function fileNameFor(url: URL, format: Kind): string {
   // (Existing "--" is kept: international domains are written "xn--…".)
   const clean = (s: string) => s.toLowerCase().replace(/(%[0-9a-f]{2})+/gi, "-").replace(/[^a-z0-9._-]+/g, "-").replace(/^[-._]+|[-._]+$/g, "");
   const host = clean(url.port ? `${url.hostname}-${url.port}` : url.hostname) || "page";
@@ -33,7 +36,7 @@ export function fileNameFor(url: URL, format: Format): string {
 
 // Where to save: --output as a file path, or as a folder when it ends with a slash or is an existing folder;
 // otherwise ./crawler-free-output/<name>. The user's own --output is trusted; generated names stay inside their folder.
-export async function targetPath(output: string | undefined, cwd: string, url: URL, format: Format): Promise<string> {
+export async function targetPath(output: string | undefined, cwd: string, url: URL, format: Kind): Promise<string> {
   const name = fileNameFor(url, format);
   if (output === undefined) return inside(resolve(cwd, OUTPUT_DIR), name);
   if (output.trim() === "") throw new CliError("--output needs a file or folder name.", EXIT.usage, "USAGE");

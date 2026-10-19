@@ -265,3 +265,96 @@ The 14 tests cover:
 **Notes:**
 - The full `npm audit` (dev tools included) reports high-severity advisories in `sharp` and `undici` via `wrangler`/`miniflare`/`@cloudflare/vitest-pool-workers`. These are local development and test tools only, unchanged in this phase; the suggested fix is a breaking downgrade, so it's left for a separate dependency update.
 - The web page's crawl view still shows only `completed`/`total`; showing `failed` there is a possible follow-up.
+
+## 8. Phase 5 result: `extract` and `setup` (2026-10-19, not committed; no backend change)
+
+`crawler-free extract <url> --fields <a,b,...> [-o <file or folder/>] [--stdout] [--force] [--json] [-q]`
+
+**`extract`:**
+- **Field names** follow the service's rules for saved setups: trimmed, spaces become `_`, repeats dropped, 1 to 20 names of up to 60 characters. `--fields` can be given more than once.
+- **The request** is `{ type: "json", schema }` with the same schema the service builds for a saved setup's facts. So the same page and fields within the hour come from the cache, and use no fact look-up.
+- **Before the request:** the file check happens first, like `scrape`, so a refusal uses no quota. On the hosted service it explains the AI quota: 20 fresh look-ups a day per connection, cached answers free.
+- **Never retried automatically.**
+- **Output:**
+  - **Saved file:** the facts exactly as returned, as `<page>.facts.json`. That name can't clash with `scrape -f json`'s `<page>.json`.
+  - **Terminal:** each fact is shown, and empty ones are named ("Not found on the page, or the model couldn't tell"). Every run ends with a reminder that a small AI model can be wrong.
+  - **For scripts:** `--stdout` prints the JSON; `--json` adds `facts`, `empty` and `cached`.
+- **Exit codes:** a limit is exit 4, with a separate explanation for the per-connection limit and for the shared AI budget. `EXTRACT_FAILED` is exit 1.
+
+**`setup`:**
+- **What it asks:** at a terminal, it asks which service to use. Pressing Enter picks the hosted one. Choosing your own copy first explains that a deployed copy is needed, with a link to the README's self-hosting steps, then asks for its address (up to 3 tries, a bare host gets `https://`).
+- **Without questions:** `--hosted`, `--api-url <address>` and `--reset` skip them. In a script, or with `--json`, it never asks and picks the hosted service.
+- **Before saving:** it runs `doctor`'s connection and API checks. If they fail, nothing is saved unless `--force` is given or you answer yes at a terminal.
+- **After saving:** it prints the settings file, how to change or reset it, and the hosted limits. It also warns when `CRAWLER_FREE_API_URL` overrides the saved choice. A broken settings file is replaced.
+- **What it saves (D8 refined):**
+  - The hosted choice is just `{ "mode": "hosted" }`, so it follows the address built into the CLI if the hosted service ever moves.
+  - Your own copy is `{ "mode": "self-hosted", "apiUrl": ... }`.
+  - Nothing else is ever stored: no keys, tokens or passwords.
+  - A file that says hosted but names another address, or has an unknown mode, is reported as invalid.
+- **`--reset`** removes the file, and its `crawler-free` folder if that's left empty.
+
+**Also changed:**
+- **Prompts:** pressing Ctrl+C at a question now stops the program (exit 130) without changing anything. End of input counts as an empty answer, which is always the safe default. Before, Ctrl+C could leave the program ending with exit 0.
+- **Page text in the terminal:** titles and facts shown on screen have control characters, escape sequences and direction overrides removed (`printable`), so a page can't send escape sequences to your terminal. Saved files and `--stdout` keep the data exactly.
+- **Error codes:** a separate hint for each limit code. Error codes are looked up with `Object.hasOwn`, so a code like `constructor` can't match an inherited property.
+- **Help:** lists all five commands. The `scrape` hint no longer calls `crawl` "coming next".
+
+| Files | Change |
+|---|---|
+| `cli/src/extract.ts`, `cli/src/setup.ts` (new) | The two commands |
+| `cli/src/config.ts` | Settings file format above; reset removes the empty folder |
+| `cli/src/doctor.ts` | `serviceChecks`, shared with `setup` |
+| `cli/src/args.ts`, `main.ts` | `--fields` (repeatable), `--hosted`, `--reset`; dispatch; help |
+| `cli/src/errors.ts`, `ui.ts`, `output.ts`, `scrape.ts`, `bin.ts`, `node.d.ts` | Limit hints, `printable`, `.facts.json` names, prompt handling, types |
+| `cli/test/extract.test.ts` (new) | 11 tests |
+| `cli/test/setup.test.ts` (new) | 10 tests |
+| `cli/test/core.test.ts`, `commands.test.ts` | Settings format, reset, limit hints, `printable`; removed the "not available yet" check |
+
+The 11 `extract` tests cover:
+- the request and schema, the file and the output
+- the hosted quota note
+- field-name rules
+- empty facts
+- `--stdout`/`--json`/`-q`
+- the cache note
+- escape sequences in page text
+- limits, failures and broken answers, each sent once
+- overwrite protection before the request
+- names that don't clash
+- option checks
+
+The 10 `setup` tests cover:
+- a script with no options
+- `--api-url`, then `doctor` using it, then `--reset`
+- answers at a terminal: Enter, your own copy with a bad address first, and three unclear answers
+- failed checks with no, yes and `--force`
+- not a Crawler Free service, and unreachable
+- `--json`/`-q`
+- the `CRAWLER_FREE_API_URL` note, and replacing a broken file
+- option checks
+
+**Checks run:**
+- `npm run typecheck` passed; `npm test` 36/36.
+- `npm run typecheck:cli` passed; `npm run test:cli` 75/75.
+- `npm run build:cli` passed (54.4 KB).
+- `npm run build:ui` reproduces `public/`.
+- `npm audit --omit=dev` found 0 vulnerabilities.
+- `npm pack --dry-run` lists `dist/crawler-free.mjs` and `package.json`.
+- `cli/src` has no shell commands or `eval`.
+
+**Real runs with the built CLI** (settings in a scratch folder; the real `%APPDATA%\crawler-free` was never created):
+- **Local Worker** (`wrangler dev -c wrangler.ci.toml`):
+  - `setup --api-url` saved `self-hosted`.
+  - `doctor` and `scrape` used it.
+  - `extract` failed cleanly (exit 1), because that copy has no AI binding.
+  - `setup --reset` removed the file and folder.
+- **Hosted service:**
+  - `setup --hosted` saved `{ "mode": "hosted" }`; its checks use no page-read or AI quota.
+  - One `extract` of a books.toscrape.com page returned the right title, `£51.77` and availability in 3.6 s.
+  - Repeating it in PowerShell with `--json` and with `--stdout` was answered from the cache (no look-up used), with "£" intact.
+
+**Not verified:**
+- **The real terminal prompt**, including Ctrl+C and end of input. Tests inject the answers, and there is no terminal to type into here.
+- **Cache sharing with a saved setup's run.** It's by construction (same schema), not tested live.
+
+**For Phase 6 docs:** `crawler-free setup` (choosing the service) and the web page's "saved setups" (one-click re-runs) share a word. The README and GUIDE should keep them clearly apart.
