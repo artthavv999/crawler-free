@@ -38,6 +38,7 @@
     <nav aria-label="Sections">
       <a href="#features">Features</a>
       <a href="#how">How it works</a>
+      <a href="#terminal">Terminal</a>
       <a href="#api">API</a>
       <a href="#faq">FAQ</a>
       <a class="nav-guide" href="https://github.com/artthavv999/crawler-free/blob/main/GUIDE.md">Guide</a>
@@ -142,7 +143,7 @@
               <p>Menus, cookie banners, sidebars and other page furniture are removed. What's left comes back as clean Markdown you can read, paste into notes, or hand to an AI.</p>
               <ul class="facts">
                 <li>Headings, lists and code blocks come through as Markdown</li>
-                <li>Pages that need JavaScript are opened in a real browser when their HTML is nearly empty</li>
+                <li>Pages that show no text without JavaScript can't be read for now (see the FAQ)</li>
                 <li>Answers are cached for 1 hour</li>
               </ul>
               <button type="button" class="ghost try" data-mode="text">Try it</button>
@@ -276,6 +277,49 @@ const page = await app.scrape("https://example.com");</code></pre>
       </div>
     </section>
 
+    <section class="section" id="terminal" aria-labelledby="terminal-title" tabindex="-1">
+      <div class="wrap api">
+        <div class="api-copy">
+          <p class="eyebrow" data-scramble>Terminal</p>
+          <h2 id="terminal-title" data-reveal>Or type one command.</h2>
+          <p data-reveal>The <code>crawler-free</code> command does everything this page does and saves the results as files. It needs no account, no key and no setup. Pick the tab that matches your computer.</p>
+          <ul class="facts" data-reveal>
+            <li>Type <code>crawler-free</code> on its own for a guided menu that asks what to do</li>
+            <li>Results go into a <code>crawler-free-output</code> folder, and the full path is printed; a file is never replaced without asking</li>
+            <li>If something fails, <code>crawler-free doctor</code> checks your setup and the connection, and says what to fix</li>
+          </ul>
+          <p data-reveal>No package manager? Each <a href="https://github.com/artthavv999/crawler-free/releases">release</a> also has the program to download by hand. That's for advanced users: <a href="https://github.com/artthavv999/crawler-free/blob/main/cli/README.md#standalone-downloads-no-nodejs-needed">check the download is genuine</a> before you run it, and never switch off your computer's security protection to run it.</p>
+          <p data-reveal><a href="https://github.com/artthavv999/crawler-free/blob/main/GUIDE.md#the-quick-terminal-way-the-crawler-free-command">Step by step in the guide</a></p>
+        </div>
+        <div class="snippets card glowy" data-tilt>
+          <div class="snippets-head">
+            <div class="tabs" role="tablist" aria-label="Ways to get the command">
+              <button type="button" role="tab" id="it-node" aria-controls="ip-node" aria-selected="true">Node.js</button>
+              <button type="button" role="tab" id="it-brew" aria-controls="ip-brew" aria-selected="false" tabindex="-1">Mac, Linux</button>
+              <button type="button" role="tab" id="it-scoop" aria-controls="ip-scoop" aria-selected="false" tabindex="-1">Windows</button>
+            </div>
+            <button type="button" class="ghost small copy-code">Copy code</button>
+          </div>
+          <div role="tabpanel" id="ip-node" aria-labelledby="it-node" tabindex="0">
+            <pre class="code" data-lenis-prevent><code>npx crawler-free scrape https://example.com</code></pre>
+            <p class="hint">Node.js 22 or newer (<code>node --version</code> shows it): nothing to install. The first time, npx asks to download the command; type <code>y</code>. To keep it installed, so you can type just <code>crawler-free</code>, run <code>npm install --global crawler-free</code>.</p>
+          </div>
+          <div role="tabpanel" id="ip-brew" aria-labelledby="it-brew" tabindex="0" hidden>
+            <pre class="code" data-lenis-prevent><code>brew tap artthavv999/crawler-free https://github.com/artthavv999/crawler-free
+brew install crawler-free
+crawler-free scrape https://example.com</code></pre>
+            <p class="hint">No Node.js needed: <a href="https://brew.sh">Homebrew</a> downloads the right program, checks it against the release's published checksum and keeps it on your PATH. Update with <code>brew upgrade crawler-free</code>; remove with <code>brew uninstall crawler-free</code>.</p>
+          </div>
+          <div role="tabpanel" id="ip-scoop" aria-labelledby="it-scoop" tabindex="0" hidden>
+            <pre class="code" data-lenis-prevent><code>scoop bucket add crawler-free https://github.com/artthavv999/crawler-free
+scoop install crawler-free
+crawler-free scrape https://example.com</code></pre>
+            <p class="hint">No Node.js needed: <a href="https://scoop.sh">Scoop</a> downloads the right program, checks it against the release's published checksum and keeps it on your PATH. Update with <code>scoop update crawler-free</code>; remove with <code>scoop uninstall crawler-free</code>.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="section" id="api" aria-labelledby="api-title" tabindex="-1">
       <div class="wrap api">
         <div class="api-copy">
@@ -291,7 +335,7 @@ const page = await app.scrape("https://example.com");</code></pre>
               <button type="button" role="tab" id="st-js" aria-controls="sp-js" aria-selected="false" tabindex="-1">JavaScript</button>
               <button type="button" role="tab" id="st-py" aria-controls="sp-py" aria-selected="false" tabindex="-1">Python</button>
             </div>
-            <button type="button" class="ghost small" id="copy-code">Copy code</button>
+            <button type="button" class="ghost small copy-code">Copy code</button>
           </div>
           <div role="tabpanel" id="sp-curl" aria-labelledby="st-curl" tabindex="0">
             <pre class="code" data-lenis-prevent><code>curl -X POST <span data-origin>https://crawler-free.crawler-free.workers.dev</span>/v2/scrape \
@@ -342,7 +386,7 @@ print(res.json()["data"]["markdown"])</code></pre>
           </div>
           <div class="acc-item">
             <h3><button type="button" class="acc-btn" id="q4" aria-expanded="false" aria-controls="a4">What about pages that need JavaScript?</button></h3>
-            <div class="acc-panel" id="a4" role="region" aria-labelledby="q4"><div><p>If a page's HTML is nearly empty, it's opened in Cloudflare's Browser Run. That browser is shared and has a small daily budget, so at busy moments you may be asked to try again in 10 seconds. Whole-website reads retry busy pages by themselves.</p></div></div>
+            <div class="acc-panel" id="a4" role="region" aria-labelledby="q4"><div><p>Opening pages in a browser is switched off on this service for now (since 20 October 2026, for a security review), so a page that shows no text without JavaScript returns an error instead. Most pages put their text in the HTML and read normally. When it's back on, such pages are opened in Cloudflare's Browser Run, which is shared and has a small daily budget.</p></div></div>
           </div>
           <div class="acc-item">
             <h3><button type="button" class="acc-btn" id="q5" aria-expanded="false" aria-controls="a5">What do you keep?</button></h3>

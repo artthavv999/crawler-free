@@ -260,8 +260,6 @@ renderSaved();
 
 // ---------- the rest of the page ----------
 tabs(document.querySelector('.feature-tabs [role="tablist"]'));
-const snippetTabs = document.querySelector('.snippets [role="tablist"]');
-tabs(snippetTabs);
 accordion(document.querySelector(".accordion"));
 
 // "Try it" picks that mode in the reader and puts the cursor in the address box.
@@ -279,20 +277,24 @@ if (location.origin !== PROD && /^https?:$/.test(location.protocol)) {
   for (const s of document.querySelectorAll("[data-origin]")) s.textContent = location.origin;
 }
 
-const codeStatus = el("span", "sr-only");
-codeStatus.setAttribute("role", "status");
-$("copy-code").after(codeStatus);
-$("copy-code").addEventListener("click", async () => {
-  const pre = document.querySelector('.snippets [role="tabpanel"]:not([hidden]) pre');
-  const b = $("copy-code");
-  try {
-    await navigator.clipboard.writeText(pre.textContent);
-    b.textContent = codeStatus.textContent = "Copied";
-  } catch {
-    b.textContent = codeStatus.textContent = "Couldn't copy";
-  }
-  setTimeout(() => { b.textContent = "Copy code"; codeStatus.textContent = ""; }, 1600);
-});
+// Each code card (the terminal commands and the API examples) has tabs and a button that copies the open tab's code.
+for (const card of document.querySelectorAll(".snippets")) {
+  tabs(card.querySelector('[role="tablist"]'));
+  const b = card.querySelector(".copy-code");
+  const codeStatus = el("span", "sr-only");
+  codeStatus.setAttribute("role", "status");
+  b.after(codeStatus);
+  b.addEventListener("click", async () => {
+    const pre = card.querySelector('[role="tabpanel"]:not([hidden]) pre');
+    try {
+      await navigator.clipboard.writeText(pre.textContent);
+      b.textContent = codeStatus.textContent = "Copied";
+    } catch {
+      b.textContent = codeStatus.textContent = "Couldn't copy";
+    }
+    setTimeout(() => { b.textContent = "Copy code"; codeStatus.textContent = ""; }, 1600);
+  });
+}
 
 const top = $("top");
 const onScroll = () => top.classList.toggle("scrolled", scrollY > 8);
