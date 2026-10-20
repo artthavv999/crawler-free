@@ -405,6 +405,7 @@ The 10 `setup` tests cover:
   3. `npm publish --access public` in a Terminal panel tab. npm printed an "Authenticate your account at" link; it was opened in the built-in browser and approved with the security key.
 - **Snags along the way:** npm 11.17 crashed (`Exit handler never called!`) whenever a login link expired and it fell back to a username prompt. Repeated attempts hit npm's "2FA attempts currently rate limited".
 - **Docs:** README, GUIDE and `cli/README.md` are back to `npx crawler-free`, and README keeps a one-line from-source alternative. `"private": true` is gone from `cli/package.json`.
+- **0.1.1, the same day:** 0.1.0 was published while `cli/README.md` still had its "Not on npm yet" note, and npm's package page shows the newest version's README. 0.1.1 changes only the README and the version number. The first approval link expired before it was used; a fresh `npm publish` and an immediate security-key approval worked.
 
 Later, optionally: publishing from GitHub Actions with npm's trusted publishing would add provenance (a signed link from the package to this repository's source), and would avoid browser sign-ins for future releases. A local publish can't add that.
 
