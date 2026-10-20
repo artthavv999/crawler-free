@@ -479,9 +479,18 @@ It also signs the program ad hoc on macOS (macOS won't run unsigned programs), a
 
 Each build covered the tests, the build, macOS ad-hoc signing, the check that the program runs with Node built in, and packaging. The draft-release job was skipped, as it should be for a dry run.
 
-**Not verified yet** (the first tagged release will show these):
-- SmartScreen and Gatekeeper behaviour on a real download.
-- `gh attestation verify`.
-- The draft-release job itself.
+**First release: [crawler-free 0.1.2](https://github.com/artthavv999/crawler-free/releases/tag/cli-v0.1.2)** (tag `cli-v0.1.2`, commit `8b19173`, run 39388220240).
+- **Build:** all five builds and the draft-release job passed. The draft held the five archives, `SHA256SUMS.txt` and GitHub's two source archives. It was published at 07:49 UTC on 2026-10-20 as the latest release, not a pre-release.
+- **Checked from the public download links:**
+  - `sha256sum -c` passes for the Windows zip.
+  - All five lines of `SHA256SUMS.txt` match the digests GitHub reports for the assets.
+- **Provenance:** GitHub's public attestation is an SLSA v1 provenance covering all six files. It names `cli-release.yml` at `refs/tags/cli-v0.1.2`, commit `8b19173` and the run. It's signed through Sigstore with a 10-minute certificate issued to that workflow and tag, and recorded in Sigstore's public transparency log.
+- **The downloaded program:** unpacked from the zip, it ran with no Node.js on the PATH. `--version` printed 0.1.2, `doctor` said "Standalone build, with Node.js 26.12.0 built in", and `scrape` saved a page.
+
+**Not verified:**
+- **SmartScreen and Gatekeeper prompts:** a download with `curl` doesn't carry the "downloaded from the internet" mark that triggers them.
+- **The full cryptographic `gh attestation verify`:** the GitHub CLI isn't installed here. The statement and the certificate's identity were checked instead.
+
+npm is still on 0.1.1. It differs only in `doctor`'s standalone line, which never shows under npm.
 
 The program's Windows file details still say "Node.js" (changing them needs another tool).
