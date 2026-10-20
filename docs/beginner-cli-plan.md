@@ -203,3 +203,24 @@ The 12 menu tests cover:
 - **The installs: now verified.** The workflow's second run (39412975093, commit `85cd908`) passed on every runner: Scoop on Windows, and Homebrew on Linux x64, macOS Intel and macOS Apple silicon. Each installed from the files in this repository, ran the program, passed its checks (`brew test` and the licence file for Homebrew, a matching `--version` for Scoop), and uninstalled cleanly. The first run (39412423786) had already installed with Homebrew, but failed on the test's own "is it gone?" check: bash remembers a command's path, which `hash -r` now clears.
 - **Desktop warnings:** whether Scoop installs avoid Windows' "downloaded from the internet" warnings on a real desktop. Homebrew never marks command-line formulas that way. The docs only promise what's certain.
 - **Which version you get:** the package managers install 0.1.2 until the next release. The guided menu and the clearer `doctor` from Phase B arrive with that release, after which `npm run cli:manifests` must be run and committed.
+
+## 8. Release 0.2.0 and clean-up (2026-10-20)
+
+**Dependencies** (Dependabot's open pull requests):
+- **#8 and #4, applied:** esbuild 0.28.2 (released 72 days earlier) and TypeScript 7.0.2 (103 days), both past the 14-day rule (`98bf799`).
+  - The web page bundle rebuilt byte for byte.
+  - TypeScript 7 typechecks the Worker and the CLI, and still reports a deliberate type error.
+  - Dependabot then closed both pull requests itself.
+- **#5, vitest 5, closed by Dependabot** after the ignore rule: Cloudflare's test pool only supports vitest 4.
+- **#6 and #7, closed with a comment:** CodeQL's split init and analyze 4.39.0 was 5 days old. The grouped actions config proposes one combined update once it's old enough.
+
+**crawler-free 0.2.0** (`03ac705`, tag `cli-v0.2.0`): Phases A and B for users. 0.2.0 rather than 0.1.3, because it adds the guided menu and now refuses remote `http://` service addresses.
+- **GitHub release:** all five builds and the draft passed (run 39413962871). Published as the latest release at 11:23 UTC.
+- **npm:** `crawler-free@0.2.0` published with the owner's security-key approval.
+- **Homebrew and Scoop:** `npm run cli:manifests` regenerated both files for 0.2.0, with checksums matching GitHub's digests (`f1db917`). The package-managers workflow installed 0.2.0 from them on Windows, Linux x64, and macOS on both chips, ran it, and uninstalled cleanly (run 39415283561).
+- **npm, checked from the registry:** 0.2.0 is latest, and its checksum matches the upload. In an empty folder with an empty npm cache:
+  - `npx crawler-free --version` printed 0.2.0;
+  - `doctor` ended "Everything looks ready.";
+  - `scrape https://example.com` saved the page;
+  - with no arguments in a script there was no menu, just help (which now mentions it) and exit code 2;
+  - a remote `http://` service address was refused with its next step.
