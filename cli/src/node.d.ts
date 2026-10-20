@@ -33,6 +33,8 @@ declare module "node:fs/promises" {
   export function rmdir(path: string): Promise<void>;
   export function access(path: string, mode?: number): Promise<void>;
   export function stat(path: string): Promise<{ isDirectory(): boolean; isFile(): boolean }>;
+  export function lstat(path: string): Promise<{ isDirectory(): boolean; isFile(): boolean; isSymbolicLink(): boolean }>;
+  export function rename(from: string, to: string): Promise<void>;
   export function readdir(path: string): Promise<string[]>;
 }
 
@@ -62,6 +64,7 @@ declare module "node:path" {
   export const posix: PathApi;
   export function join(...parts: string[]): string;
   export function dirname(p: string): string;
+  export function basename(p: string): string;
   export function resolve(...parts: string[]): string;
   export const sep: string;
 }

@@ -1,5 +1,5 @@
-import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
-import { dirname, resolve, sep } from "node:path";
+import { lstat, mkdir, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import { CliError, EXIT } from "./errors";
 
 export type Format = "markdown" | "links" | "json";
@@ -73,9 +73,11 @@ export async function saveFile(path: string, content: string, o: { force: boolea
     throw cantSave(path, e); // e.g. a file where a folder is needed
   }
   try {
-    await writeFile(path, content, { encoding: "utf8", flag: o.force ? "w" : "wx" });
+    if (o.force) await replaceFile(path, content);
+    else await writeFile(path, content, { encoding: "utf8", flag: "wx" });
     return;
   } catch (e) {
+    if (e instanceof CliError) throw e;
     if ((e as { code?: string }).code !== "EEXIST") throw cantSave(path, e);
   }
   if (o.ask) {
@@ -84,13 +86,30 @@ export async function saveFile(path: string, content: string, o: { force: boolea
       throw new CliError(`Kept the existing file ${path}; nothing was saved.`, EXIT.output, "FILE_EXISTS", "Use --output to choose another name, or --force to replace it.");
     }
     try {
-      await writeFile(path, content, { encoding: "utf8", flag: "w" });
+      await replaceFile(path, content);
       return;
     } catch (e) {
-      throw cantSave(path, e);
+      throw e instanceof CliError ? e : cantSave(path, e);
     }
   }
   throw new CliError(`${path} already exists.`, EXIT.output, "FILE_EXISTS", "Use --force to replace it, or --output to choose another name.");
+}
+
+// Replaces a file without writing through whatever is at its path (audit finding E): the content goes into a new file
+// beside it (exclusive create, a random name), which is then renamed over the target. A symbolic link there is replaced,
+// not followed; a crash never leaves a half-written file; a folder at that path is refused.
+export async function replaceFile(path: string, content: string): Promise<void> {
+  if ((await lstat(path).catch(() => null))?.isDirectory()) {
+    throw new CliError(`${path} is a folder, so nothing was saved there.`, EXIT.output, "BAD_PATH", "Choose a file name with --output.");
+  }
+  const temp = join(dirname(path), `.${basename(path)}.${crypto.randomUUID()}.tmp`);
+  await writeFile(temp, content, { encoding: "utf8", flag: "wx" });
+  try {
+    await rename(temp, path);
+  } catch (e) {
+    await rm(temp, { force: true });
+    throw e;
+  }
 }
 
 export function cantSave(path: string, e: unknown): CliError {

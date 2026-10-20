@@ -77,13 +77,31 @@ describe("settings", () => {
     expect(configPath({ platform: "linux", env: {}, homedir: home })).toBe("/home/ada/.config/crawler-free/config.json");
   });
 
-  it("only accept http(s) service addresses without credentials, query or fragment", () => {
+  it("only accept https service addresses (plain http only for this computer), without credentials, query or fragment", () => {
     expect(checkApiUrl("https://crawler-free.crawler-free.workers.dev/")).toBe(DEFAULT_API);
-    expect(checkApiUrl("http://localhost:8787")).toBe("http://localhost:8787");
     expect(checkApiUrl("https://example.com/api//")).toBe("https://example.com/api");
-    for (const bad of ["ftp://example.com", "file:///etc/passwd", "javascript:alert(1)", "https://user:pw@example.com", "https://example.com/?k=1", "https://example.com/#x", "example.com", ""]) {
-      expect(() => checkApiUrl(bad), bad).toThrow(CliError);
+    for (const local of ["http://localhost:8787", "http://127.0.0.1:8788", "http://127.8.9.10", "http://[::1]:8787", "http://dev.localhost:3000"]) {
+      expect(checkApiUrl(local), local).toBe(local);
     }
+    const bad = ["ftp://example.com", "file:///etc/passwd", "javascript:alert(1)", "https://user:pw@example.com", "https://example.com/?k=1",
+      "https://example.com/#x", "example.com", "", "http://example.com", "http://192.168.1.5:8787", "http://10.0.0.1",
+      "http://127.0.0.1.nip.io", "http://localhost.example.com", "http://[::ffff:127.0.0.1]", "http://0.0.0.0"];
+    for (const b of bad) expect(() => checkApiUrl(b), b).toThrow(CliError);
+    expect(() => checkApiUrl("http://example.com")).toThrow(expect.objectContaining({
+      message: "The service address must start with https:// (got http://example.com).",
+      hint: "Plain http:// is only allowed for a copy running on this computer (localhost or 127.0.0.1).",
+    }));
+  });
+
+  it("refuse a settings file or environment variable that names a remote http:// service", async () => {
+    const s = await sys();
+    const path = await writeConfig(s, { apiUrl: "https://my.example", mode: "self-hosted" });
+    const { writeFile } = await import("node:fs/promises");
+    await writeFile(path, JSON.stringify({ mode: "self-hosted", apiUrl: "http://my.example" }));
+    await expect(readConfig(s)).rejects.toMatchObject({ code: "CONFIG_INVALID" });
+    const env = await sys();
+    env.env.CRAWLER_FREE_API_URL = "http://my.example";
+    await expect(resolveApiUrl(undefined, env)).rejects.toMatchObject({ code: "BAD_API_URL", exitCode: EXIT.usage });
   });
 
   const sys = async (): Promise<System> => {

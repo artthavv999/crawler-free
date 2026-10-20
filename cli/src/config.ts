@@ -16,7 +16,13 @@ export function configPath({ platform, env, homedir }: System): string {
   return posix.join(env.XDG_CONFIG_HOME || posix.join(homedir, ".config"), "crawler-free", "config.json");
 }
 
-// A service address the CLI will talk to: http or https, no user name or password, no query or fragment.
+// This computer only: plain http:// is allowed for these, for running your own copy locally.
+const isLoopback = (host: string) =>
+  host === "localhost" || host.endsWith(".localhost") || host === "[::1]" || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host);
+
+// A service address the CLI will talk to: https (plain http only for this computer, audit finding D), no user name or
+// password, no query or fragment. Page addresses, options and answers travel over it, so nothing in between may read
+// or change them.
 export function checkApiUrl(raw: string): string {
   let u: URL;
   try {
@@ -25,6 +31,10 @@ export function checkApiUrl(raw: string): string {
     throw new CliError(`"${raw}" isn't a valid web address.`, EXIT.usage, "BAD_API_URL", "Use the full address, for example https://crawler-free.crawler-free.workers.dev");
   }
   if (u.protocol !== "https:" && u.protocol !== "http:") throw new CliError(`The service address must start with https:// (got ${u.protocol}).`, EXIT.usage, "BAD_API_URL");
+  if (u.protocol === "http:" && !isLoopback(u.hostname)) {
+    throw new CliError(`The service address must start with https:// (got ${u.origin}).`, EXIT.usage, "BAD_API_URL",
+      "Plain http:// is only allowed for a copy running on this computer (localhost or 127.0.0.1).");
+  }
   if (u.username || u.password) throw new CliError("The service address mustn't contain a user name or password.", EXIT.usage, "BAD_API_URL");
   if (u.search || u.hash) throw new CliError("The service address mustn't contain ? or # parts.", EXIT.usage, "BAD_API_URL");
   return u.href.replace(/\/+$/, "");

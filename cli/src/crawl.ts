@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import type { Args } from "./args";
 import type { ApiClient } from "./client";
 import { CliError, EXIT } from "./errors";
-import { cantSave, fileNameFor, hostSlug, inside, mayUseFolder, OUTPUT_DIR, type Ask } from "./output";
+import { cantSave, fileNameFor, hostSlug, inside, mayUseFolder, OUTPUT_DIR, replaceFile, type Ask } from "./output";
 import { pageUrl } from "./scrape";
 import type { Ui } from "./ui";
 
@@ -173,8 +173,10 @@ export async function crawl(o: { args: Args; client: ApiClient; ui: Ui; cwd: str
 
 async function save(path: string, content: string, replace: boolean): Promise<void> {
   try {
-    await writeFile(path, content, { encoding: "utf8", flag: replace ? "w" : "wx" });
+    if (replace) await replaceFile(path, content);
+    else await writeFile(path, content, { encoding: "utf8", flag: "wx" });
   } catch (e) {
+    if (e instanceof CliError) throw e;
     if ((e as { code?: string }).code === "EEXIST") {
       throw new CliError(`${path} appeared while the crawl was running; nothing was replaced.`, EXIT.output, "FILE_EXISTS", "Run it again with --force, or choose another folder with --output.");
     }
