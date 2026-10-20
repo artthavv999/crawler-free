@@ -11,6 +11,13 @@ updates:
     cooldown:
       default-days: 14
     open-pull-requests-limit: 5
+    ignore:
+      # @cloudflare/vitest-pool-workers (0.23.0, the newest on 2026-10-20) only supports vitest 4 (peer ^4.1.0), so
+      # vitest 5 can't be installed beside it and npm ci fails. Remove these once a release of it supports vitest 5.
+      - dependency-name: vitest
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitest/*"
+        update-types: ["version-update:semver-major"]
     groups:
       dev-tooling:
         dependency-type: development
