@@ -72,7 +72,18 @@ at `6e493dc` (the same as GitHub's `main`) before planning. **No code was change
 - **Distributed abuse** of the keyless service (many addresses, IPv6 rotation) is limited by the shared daily budgets and the kill switch, not prevented. The Workers Free request quota (100,000 a day) is the real ceiling, and no counter can protect it.
 - **Unsigned downloads** remain a trust gap until E6 or paid signing is in place.
 
-## 5. Phase A result (2026-10-20, not committed, not deployed)
+## 5. Phase A result (2026-10-20; committed `d3c721d` and `5db188a`; Worker deployed as version `f509bce2`)
+
+**Live checks after the deploy:**
+- **Budget order:** counters read from production D1 before and after each step, for the caller's own day count and the shared page reads.
+  - Three invalid requests (malformed JSON, a blocked address, bad formats) each got `400` and changed neither count (33 and 14).
+  - A fresh read (`MISS`) added 1 to each (34 and 15).
+  - The same read again (`HIT`) added 1 to the caller's count only (35 and 15).
+- **`/run` text:** a temporary saved setup for a test page with a C1 control character (U+009B) in its text.
+  - `/run/{id}` answered `text/plain` without it, and with no other control characters.
+  - `?format=json` still had it.
+  - The setup was deleted afterwards.
+  - (Carriage returns can't reach `/run` from a page: HTML parsing already turns them into newlines.)
 
 - **Budget order (E1)**, `src/index.ts`, `src/scrape.ts`, `src/setups.ts`:
   - **What's checked first:** `/v2/scrape` checks the body, formats and address shape before any limit. `/run/{id}` loads the setup first. `/v2/crawl` checks the body, options and address before the daily crawl limits.
