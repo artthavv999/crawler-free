@@ -51,7 +51,7 @@ jobs:
       - run: npm run typecheck:cli
       - run: npm run test:cli
       - run: npm run build:cli
-      - name: The built command runs, and the package holds only the built file
+      - name: The built command runs, and the package holds only the built file, its README and licence
         run: |
           node cli/dist/crawler-free.mjs --version
           node cli/dist/crawler-free.mjs --help > /dev/null
@@ -59,8 +59,16 @@ jobs:
             let s = ''; process.stdin.on('data', (d) => (s += d)).on('end', () => {
               const files = JSON.parse(s)[0].files.map((f) => f.path).sort();
               console.log(files.join('\n'));
-              if (JSON.stringify(files) !== JSON.stringify(['dist/crawler-free.mjs', 'package.json'])) process.exit(1);
+              if (JSON.stringify(files) !== JSON.stringify(['LICENSE', 'README.md', 'dist/crawler-free.mjs', 'package.json'])) process.exit(1);
             });"
+      - name: A clean install from the packed file works
+        run: |
+          cd cli && npm pack --pack-destination "$RUNNER_TEMP"
+          npm install --global --prefix "$RUNNER_TEMP/clean" "$RUNNER_TEMP"/crawler-free-*.tgz
+          "$RUNNER_TEMP/clean/bin/crawler-free" --version
+          "$RUNNER_TEMP/clean/bin/crawler-free" --help > /dev/null
+          npm uninstall --global --prefix "$RUNNER_TEMP/clean" crawler-free
+          test ! -e "$RUNNER_TEMP/clean/bin/crawler-free"
 
   secrets:
     name: Gitleaks (whole git history)

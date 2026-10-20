@@ -45,11 +45,54 @@ Good to know:
 - Anyone with a setup's link can run it, so share it only with people you want to.
 - Whole-website reads can't be saved as setups; use **Go** for those.
 
-The rest of this guide shows how to do the same things from a terminal instead.
+The next section shows the `crawler-free` command, which saves results as files for you. After it come plain commands that need nothing installed at all.
 
 ---
 
-## Using the terminal instead
+## The terminal command: `crawler-free`
+
+`crawler-free` does everything the web page does and saves the results as files. It's coming to npm; once it's there, you'll just type `npx crawler-free` with nothing to download first. Until then, you can run it from a copy of the code, which takes a few steps once:
+
+1. **Install Node.js 22 or newer.** If `node --version` shows nothing or a lower number, install the LTS version from https://nodejs.org.
+2. **Download the code.** Open https://github.com/artthavv999/crawler-free, click the green **Code** button, then **Download ZIP**, and unzip it. On Windows, right-click the file and choose **Extract All**.
+3. **Open a terminal in the unzipped folder,** the one with `README.md` and `GUIDE.md` in it.
+   - On Windows: open the folder in File Explorer, click the address bar, type `powershell`, and press Enter.
+   - On a Mac: open Terminal, type `cd ` (with a space after it), drag the folder into the window, and press Enter.
+4. **Prepare the command** by typing these two lines, one at a time. The first downloads the project's tools and can take a few minutes. If it warns that some install scripts weren't run, that's fine.
+
+   ```
+   npm ci
+   ```
+   ```
+   npm run build:cli
+   ```
+
+Now `node cli/dist/crawler-free.mjs` is the command. Try it:
+
+```
+node cli/dist/crawler-free.mjs scrape https://quotes.toscrape.com/
+```
+
+It saves the page's text in a new folder called `crawler-free-output`, inside the folder your terminal is in, and prints the file's full path.
+
+| To do this | Type |
+|---|---|
+| Save a page's text | `node cli/dist/crawler-free.mjs scrape https://quotes.toscrape.com/` |
+| Save its links | `node cli/dist/crawler-free.mjs scrape https://quotes.toscrape.com/ --format links` |
+| Pull out facts | `node cli/dist/crawler-free.mjs extract https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html --fields title,price` |
+| Read a whole website | `node cli/dist/crawler-free.mjs crawl https://books.toscrape.com/ --limit 20` |
+| Check that everything works | `node cli/dist/crawler-free.mjs doctor` |
+
+Good to know:
+
+- **Crawls:** a crawl waits until the website has been read, then saves one file per page. It also saves `pages.json`, which lists every page and any that couldn't be read. There are no job IDs or progress checks to do yourself.
+- **Your files are safe:** it never replaces a file without asking you first.
+- **No setup needed:** it uses the free hosted service. `crawler-free setup` is only for choosing your own copy of Crawler Free instead, and has nothing to do with the web page's saved setups.
+- **Every option:** add `--help` to list them all, and [cli/README.md](cli/README.md) is the full reference.
+
+---
+
+## Using the terminal with plain commands
 
 The service lives at:
 
@@ -232,6 +275,11 @@ The key `fc-keyless` is a placeholder. No real key is needed.
 ---
 
 ## If something goes wrong
+
+**Using the `crawler-free` command?**
+- **Start with** `node cli/dist/crawler-free.mjs doctor`. It checks Node.js, the connection and the folder results go into, and says what to fix.
+- **Errors:** the command explains them in plain words; the codes below are behind them.
+- **PowerShell says *running scripts is disabled on this system* when you type `npm`:** type `npm.cmd` instead, for example `npm.cmd ci`. You don't need to change any settings.
 
 Every error has a `code` that says what happened:
 

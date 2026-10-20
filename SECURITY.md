@@ -23,6 +23,9 @@ In scope, for the code in this repository and the public instance at https://cra
 - Reading or deleting another person's crawl results or saved setups without their link
 - Exposure of secrets, such as the Browser Run token
 - Weaknesses in the GitHub Actions workflows or the dependency supply chain
+- The `crawler-free` command (`cli/`) and its npm package. For example: saving outside the folder you chose,
+  replacing a file without asking, letting a page's content run anything or reach your terminal as escape sequences,
+  storing secrets, or a published package that doesn't match this repository's source
 
 Not vulnerabilities:
 

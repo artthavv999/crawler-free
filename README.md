@@ -1,15 +1,52 @@
 # Crawler Free
 
-A keyless, free-hosted, Firecrawl-v2-compatible API: **URL → clean Markdown**, **whole-site crawl**, and **schema-based JSON extraction**. It runs on one Cloudflare Worker on the Free plan.
+Crawler Free turns web pages into clean Markdown, their links, or the facts you ask for, and can read a whole website page by page. It's free, with no account, key or sign-up. Use it in your browser, from a terminal, or from your own code: it answers like Firecrawl's v2 API. It runs on one Cloudflare Worker on the Free plan.
 
-**Easiest: open https://crawler-free.crawler-free.workers.dev in your browser**, paste a page address, and press Go. You can save a page as a one-click setup and re-run it later with one click, its link, or one terminal command (`irm <link>`). The step-by-step [GUIDE.md](GUIDE.md) covers the web page and copy-paste terminal commands for Windows, Mac and Linux.
+## In your browser
 
-- **Base URL:** `https://crawler-free.crawler-free.workers.dev`
+Open **https://crawler-free.crawler-free.workers.dev**, paste a page address, and press **Go**. You can save a page as a one-click setup and re-run it later with one click, its link, or one terminal command. [GUIDE.md](GUIDE.md) walks through it step by step.
+
+## In a terminal
+
+The `crawler-free` command is coming to npm. Once it's there, `npx crawler-free scrape https://example.com` will be all it takes. Until then, run it from a copy of this repository. You need [Node.js](https://nodejs.org) 22 or newer and Git; it works on Windows, Mac and Linux.
+
+```bash
+git clone https://github.com/artthavv999/crawler-free.git
+cd crawler-free
+npm ci
+npm run build:cli
+```
+
+`npm ci` also installs the project's development tools, so the first run downloads a fair amount. It may warn that some packages' install scripts weren't run; building the command doesn't need them. After that, `node cli/dist/crawler-free.mjs` is the command:
+
+```bash
+node cli/dist/crawler-free.mjs scrape https://example.com
+```
+
+That saves the page as `./crawler-free-output/example.com.md` and prints where it went.
+
+```bash
+node cli/dist/crawler-free.mjs crawl https://books.toscrape.com/ --limit 20
+```
+```bash
+node cli/dist/crawler-free.mjs extract https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html --fields title,price
+```
+
+- **Results** go into `./crawler-free-output/`, named after each page's address. An existing file is never replaced without asking.
+- **If something fails,** run `node cli/dist/crawler-free.mjs doctor`. It checks your setup and the connection, and says what to fix.
+- **More:** [cli/README.md](cli/README.md) has every command, option and exit code; [GUIDE.md](GUIDE.md) has a beginner's walk-through.
+
+## From your own code
+
+- **Base URL:** `https://crawler-free.crawler-free.workers.dev`. No API key needed.
+- **With Firecrawl's JS SDK:** the official SDK works unchanged: `new Firecrawl({ apiKey: "fc-keyless", apiUrl: "https://crawler-free.crawler-free.workers.dev" })`.
+- **The endpoints** are listed below.
+
+## About
+
 - **Source:** https://github.com/artthavv999/crawler-free (MIT, see [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md))
 - **Abuse / opt-out contact:** https://github.com/artthavv999/crawler-free/issues
 - **Security issues:** report privately, see [SECURITY.md](SECURITY.md)
-
-No API key, no sign-up. The official Firecrawl JS SDK works unchanged: `new Firecrawl({ apiKey: "fc-keyless", apiUrl: "https://crawler-free.crawler-free.workers.dev" })`.
 
 ## Endpoints
 

@@ -358,3 +358,66 @@ The 10 `setup` tests cover:
 - **Cache sharing with a saved setup's run.** It's by construction (same schema), not tested live.
 
 **For Phase 6 docs:** `crawler-free setup` (choosing the service) and the web page's "saved setups" (one-click re-runs) share a word. The README and GUIDE should keep them clearly apart.
+
+## 9. Phase 6 result: docs and the npm package (2026-10-20; publishing postponed)
+
+**Docs:**
+- **README.md:** the top now answers the plan's five questions in order. It covers what Crawler Free is, the browser, the terminal (`npx crawler-free ...`, where results go, what to do when something fails), and your own code. The endpoint and limit reference below is unchanged.
+- **GUIDE.md:** a new beginner section, "The quick terminal way", comes before the plain `curl`/`irm` steps, which stay. "If something goes wrong" now starts with `doctor` and the PowerShell script-policy workaround. It also says plainly that `crawler-free setup` is unrelated to the web page's saved setups.
+- **cli/README.md (new):** the npm package page and the full CLI reference. It covers:
+  - installing, and every command
+  - where results go
+  - scripting: `--json`, `--stdout`, `-q`, and the exit codes
+  - limits, and the settings file locations
+  - safety and privacy, and troubleshooting
+  - uninstalling
+- **SECURITY.md:** the CLI and its npm package are now in scope.
+
+**Package:**
+- **Name:** `crawler-free` is still free on npm (checked 2026-10-20, as are `crawlerfree` and `crawler-free-cli`).
+- **Contents:** the tarball holds exactly `LICENSE`, `README.md`, `package.json` and `dist/crawler-free.mjs` (19.6 kB packed, 62.5 kB unpacked).
+- **Scan:** no local paths, personal details or secrets.
+- **Changes:** `cli/package.json` gained keywords, a homepage pointing at the CLI README, and `prepublishOnly: node build.mjs`, so a publish always ships a fresh build. `"private": true` stays on as a safety latch until publishing is approved.
+- **CI:** the pack check now expects the four files, and a new step installs the packed tarball into a clean prefix on Linux (Node 22 and 24), runs it and uninstalls it.
+
+**Clean install test on Windows** (separate npm cache and prefix, in a folder named `clean install ü`):
+- `npm install --global` from the tarball worked (zero dependencies).
+- The installed command ran from Git Bash, from cmd, and from PowerShell.
+- With PowerShell scripts blocked (`-ExecutionPolicy Restricted` in a one-off process, as on a default Windows 11 machine), `crawler-free` failed with "running scripts is disabled" and `crawler-free.cmd` worked, as the docs say.
+- From `work dir ñ`, `doctor` passed and `scrape https://example.com` saved `...\work dir ñ\crawler-free-output\example.com.md`.
+- `npx --package <tarball> crawler-free --version` worked.
+- `npm uninstall --global` removed the command.
+- Settings were kept in a scratch folder; the real `%APPDATA%\crawler-free` was never created.
+
+**Checks run:**
+- `npm run typecheck` passed; `npm test` 36/36.
+- `npm run typecheck:cli` passed; `npm run test:cli` 75/75.
+- `npm run build:cli` passed.
+- `npm run build:ui` reproduces `public/`.
+- `npm audit --omit=dev` found 0 vulnerabilities.
+- The workflow YAML wasn't parsed locally (no parser installed); GitHub checks it on push.
+
+**Publish attempt (2026-10-20): approved, not completed.** Nothing was uploaded, and `crawler-free` is still free on npm.
+- **Sign-in links expired.** `npm login` waits about two minutes for its browser approval. npm also emails a one-time code at that step. The first attempts ran out of time, and npm 11.17 then fell back to a username prompt and crashed (`Exit handler never called!`). What worked: sign in to npmjs.com in the built-in browser first, start `npm login`, open its link there, and enter the emailed code straight away.
+- **2FA is required to publish.** The first publish got `403`: npm requires two-factor authentication (or a 2FA-bypass token) to publish. 2FA was then turned on (`auth-and-writes`).
+- **The old login predated 2FA.** The next publish got the same `403`. The fix was `npm logout` and a fresh login.
+- **Then the rate limit.** The repeated sign-ins hit npm's rate limit ("2FA attempts currently rate limited"), so the publish was put off.
+- **Committed state:** with `"private": true` back on, and README, GUIDE and `cli/README.md` worded for "not on npm yet": run it from a clone with `npm ci`, `npm run build:cli`, then `node cli/dist/crawler-free.mjs`. That path was tested in a fresh clone (19 s with a warm npm cache). npm 11.17 warns that the install scripts of `esbuild` and `workerd` weren't run; the CLI build doesn't need them.
+
+**To publish later** (one attempt, once the rate limit has passed):
+1. **You:** open your email first. Then, signed in to npmjs.com in the built-in browser, tell me you're ready.
+2. **Me:** start `npm login` in a Terminal panel tab and open its link in the built-in browser. **You:** enter the newest emailed code (and 2FA if asked) within two minutes.
+3. **Me:** remove `"private": true` from `cli/package.json`. From `cli/`, run `npm publish --access public` in that tab (`prepublishOnly` rebuilds first). **You:** approve the 2FA prompt npm shows for the publish.
+4. **Check it:** `npm view crawler-free`, then `npx --yes crawler-free@0.1.0 --version` and a `scrape` from an empty folder.
+5. **Reword the docs for the published package:**
+   - README "In a terminal" and GUIDE "The terminal command" go back to `npx crawler-free`.
+   - The "Not on npm yet" note at the top of `cli/README.md` is removed.
+
+   Then commit and push.
+
+Later, optionally: publishing from GitHub Actions with npm's trusted publishing would add provenance (a signed link from the package to this repository's source), and would avoid browser sign-ins. A local publish can't add that.
+
+**Not verified:**
+- macOS (Linux is covered by CI once pushed).
+- The `npx` prompt text, which comes from npm, not this package.
+- The real interactive prompts (as in Phase 5).
