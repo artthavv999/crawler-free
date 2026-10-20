@@ -8,33 +8,25 @@ Open **https://crawler-free.crawler-free.workers.dev**, paste a page address, an
 
 ## In a terminal
 
-The `crawler-free` command is coming to npm. Once it's there, `npx crawler-free scrape https://example.com` will be all it takes. Until then, run it from a copy of this repository. You need [Node.js](https://nodejs.org) 22 or newer and Git; it works on Windows, Mac and Linux.
+You need [Node.js](https://nodejs.org) 22 or newer. Then, on Windows, Mac or Linux:
 
 ```bash
-git clone https://github.com/artthavv999/crawler-free.git
-cd crawler-free
-npm ci
-npm run build:cli
+npx crawler-free scrape https://example.com
 ```
 
-`npm ci` also installs the project's development tools, so the first run downloads a fair amount. It may warn that some packages' install scripts weren't run; building the command doesn't need them. After that, `node cli/dist/crawler-free.mjs` is the command:
+That saves the page as `./crawler-free-output/example.com.md` and prints where it went. The first time, npx asks to download the command; type `y`. To install it for good, so you can type just `crawler-free`, run `npm install --global crawler-free`.
 
 ```bash
-node cli/dist/crawler-free.mjs scrape https://example.com
-```
-
-That saves the page as `./crawler-free-output/example.com.md` and prints where it went.
-
-```bash
-node cli/dist/crawler-free.mjs crawl https://books.toscrape.com/ --limit 20
+npx crawler-free crawl https://books.toscrape.com/ --limit 20
 ```
 ```bash
-node cli/dist/crawler-free.mjs extract https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html --fields title,price
+npx crawler-free extract https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html --fields title,price
 ```
 
 - **Results** go into `./crawler-free-output/`, named after each page's address. An existing file is never replaced without asking.
-- **If something fails,** run `node cli/dist/crawler-free.mjs doctor`. It checks your setup and the connection, and says what to fix.
-- **More:** [cli/README.md](cli/README.md) has every command, option and exit code; [GUIDE.md](GUIDE.md) has a beginner's walk-through.
+- **If something fails,** run `npx crawler-free doctor`. It checks your setup and the connection, and says what to fix.
+- **More:** [cli/README.md](cli/README.md) has every command, option and exit code, and [GUIDE.md](GUIDE.md) has a beginner's walk-through. The package is [crawler-free on npm](https://www.npmjs.com/package/crawler-free).
+- **From this repository's code instead:** run `npm ci` and `npm run build:cli`, then use `node cli/dist/crawler-free.mjs` in place of `npx crawler-free`.
 
 ## From your own code
 

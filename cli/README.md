@@ -1,7 +1,5 @@
 # crawler-free
 
-> **Not on npm yet.** Until it is, the `npx crawler-free` and `npm install --global crawler-free` commands below won't work. Run it from a copy of the repository instead, as the [main README](https://github.com/artthavv999/crawler-free#in-a-terminal) shows, and type `node cli/dist/crawler-free.mjs` where this page says `crawler-free`.
-
 Read web pages as clean Markdown, links or facts from your terminal, using the free [Crawler Free](https://github.com/artthavv999/crawler-free) service. No account, no key, no sign-up.
 
 ```bash

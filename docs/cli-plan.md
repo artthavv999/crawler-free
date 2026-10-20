@@ -359,7 +359,7 @@ The 10 `setup` tests cover:
 
 **For Phase 6 docs:** `crawler-free setup` (choosing the service) and the web page's "saved setups" (one-click re-runs) share a word. The README and GUIDE should keep them clearly apart.
 
-## 9. Phase 6 result: docs and the npm package (2026-10-20; publishing postponed)
+## 9. Phase 6 result: docs and the npm package (2026-10-20; published 0.1.0)
 
 **Docs:**
 - **README.md:** the top now answers the plan's five questions in order. It covers what Crawler Free is, the browser, the terminal (`npx crawler-free ...`, where results go, what to do when something fails), and your own code. The endpoint and limit reference below is unchanged.
@@ -377,7 +377,7 @@ The 10 `setup` tests cover:
 - **Name:** `crawler-free` is still free on npm (checked 2026-10-20, as are `crawlerfree` and `crawler-free-cli`).
 - **Contents:** the tarball holds exactly `LICENSE`, `README.md`, `package.json` and `dist/crawler-free.mjs` (19.6 kB packed, 62.5 kB unpacked).
 - **Scan:** no local paths, personal details or secrets.
-- **Changes:** `cli/package.json` gained keywords, a homepage pointing at the CLI README, and `prepublishOnly: node build.mjs`, so a publish always ships a fresh build. `"private": true` stays on as a safety latch until publishing is approved.
+- **Changes:** `cli/package.json` gained keywords, a homepage pointing at the CLI README, and `prepublishOnly: node build.mjs`, so a publish always ships a fresh build. `"private": true` stayed on as a safety latch until the publish.
 - **CI:** the pack check now expects the four files, and a new step installs the packed tarball into a clean prefix on Linux (Node 22 and 24), runs it and uninstalls it.
 
 **Clean install test on Windows** (separate npm cache and prefix, in a folder named `clean install ü`):
@@ -397,27 +397,17 @@ The 10 `setup` tests cover:
 - `npm audit --omit=dev` found 0 vulnerabilities.
 - The workflow YAML wasn't parsed locally (no parser installed); GitHub checks it on push.
 
-**Publish attempt (2026-10-20): approved, not completed.** Nothing was uploaded, and `crawler-free` is still free on npm.
-- **Sign-in links expired.** `npm login` waits about two minutes for its browser approval. npm also emails a one-time code at that step. The first attempts ran out of time, and npm 11.17 then fell back to a username prompt and crashed (`Exit handler never called!`). What worked: sign in to npmjs.com in the built-in browser first, start `npm login`, open its link there, and enter the emailed code straight away.
-- **2FA is required to publish.** The first publish got `403`: npm requires two-factor authentication (or a 2FA-bypass token) to publish. 2FA was then turned on (`auth-and-writes`).
-- **The old login predated 2FA.** The next publish got the same `403`. The fix was `npm logout` and a fresh login.
-- **Then the rate limit.** The repeated sign-ins hit npm's rate limit ("2FA attempts currently rate limited"), so the publish was put off.
-- **Committed state:** with `"private": true` back on, and README, GUIDE and `cli/README.md` worded for "not on npm yet": run it from a clone with `npm ci`, `npm run build:cli`, then `node cli/dist/crawler-free.mjs`. That path was tested in a fresh clone (19 s with a warm npm cache). npm 11.17 warns that the install scripts of `esbuild` and `workerd` weren't run; the CLI build doesn't need them.
+**Publish (2026-10-20): `crawler-free@0.1.0` published by `arthav.t` at 06:43 UTC.**
+- **Staged first:** npm now stages a new package. Until processing finishes, the name shows a placeholder version `0.0.0-stage` ("Temporary package placeholder for staged publishing") owned by `arthav.t`. "Staged Packages" in the account settings showed nothing waiting for approval.
+- **What it took:**
+  1. An npm account with **2FA actually registered**. Choosing a mode isn't enough: npm answered `403 … Two-factor authentication … is required to publish` until a security key (Windows Hello) was added.
+  2. A login via `npm login`. Its link lasts about two minutes, and npm also emails a one-time code, so the reliable way was to sign in to npmjs.com in the built-in browser first, then open the CLI link there.
+  3. `npm publish --access public` in a Terminal panel tab. npm printed an "Authenticate your account at" link; it was opened in the built-in browser and approved with the security key.
+- **Snags along the way:** npm 11.17 crashed (`Exit handler never called!`) whenever a login link expired and it fell back to a username prompt. Repeated attempts hit npm's "2FA attempts currently rate limited".
+- **Docs:** README, GUIDE and `cli/README.md` are back to `npx crawler-free`, and README keeps a one-line from-source alternative. `"private": true` is gone from `cli/package.json`.
 
-**To publish later** (one attempt, once the rate limit has passed):
-1. **You:** open your email first. Then, signed in to npmjs.com in the built-in browser, tell me you're ready.
-2. **Me:** start `npm login` in a Terminal panel tab and open its link in the built-in browser. **You:** enter the newest emailed code (and 2FA if asked) within two minutes.
-3. **Me:** remove `"private": true` from `cli/package.json`. From `cli/`, run `npm publish --access public` in that tab (`prepublishOnly` rebuilds first). **You:** approve the 2FA prompt npm shows for the publish.
-4. **Check it:** `npm view crawler-free`, then `npx --yes crawler-free@0.1.0 --version` and a `scrape` from an empty folder.
-5. **Reword the docs for the published package:**
-   - README "In a terminal" and GUIDE "The terminal command" go back to `npx crawler-free`.
-   - The "Not on npm yet" note at the top of `cli/README.md` is removed.
-
-   Then commit and push.
-
-Later, optionally: publishing from GitHub Actions with npm's trusted publishing would add provenance (a signed link from the package to this repository's source), and would avoid browser sign-ins. A local publish can't add that.
+Later, optionally: publishing from GitHub Actions with npm's trusted publishing would add provenance (a signed link from the package to this repository's source), and would avoid browser sign-ins for future releases. A local publish can't add that.
 
 **Not verified:**
-- macOS (Linux is covered by CI once pushed).
-- The `npx` prompt text, which comes from npm, not this package.
+- macOS (Linux is covered by CI).
 - The real interactive prompts (as in Phase 5).
