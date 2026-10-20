@@ -491,6 +491,8 @@ Each build covered the tests, the build, macOS ad-hoc signing, the check that th
 - **SmartScreen and Gatekeeper prompts:** a download with `curl` doesn't carry the "downloaded from the internet" mark that triggers them.
 - **The full cryptographic `gh attestation verify`:** the GitHub CLI isn't installed here. The statement and the certificate's identity were checked instead.
 
-npm is still on 0.1.1. It differs only in `doctor`'s standalone line, which never shows under npm.
+npm caught up the same day: `crawler-free@0.1.2` was published from the same commit, so `npx crawler-free` and the standalone downloads are the same version.
+
+**Dependabot afterwards:** its vitest 4 → 5 pull request (#5) failed `npm ci` in every job. `@cloudflare/vitest-pool-workers` (0.23.0, the newest) only accepts vitest `^4.1.0`, so `.github/dependabot.yml` now ignores major vitest updates until it supports vitest 5. The dependency-review job fails on every pull request until the repository's Dependency graph setting is turned on (Settings > Code security); that's the owner's setting to change.
 
 The program's Windows file details still say "Node.js" (changing them needs another tool).
