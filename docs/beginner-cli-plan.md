@@ -107,3 +107,63 @@ at `6e493dc` (the same as GitHub's `main`) before planning. **No code was change
   - `npm run typecheck:cli` passed; `npm run test:cli` 80 passed, 2 skipped (see above).
   - Both builds passed; `public/` is unchanged.
   - `npm audit --omit=dev` found 0 vulnerabilities; the npm package contents are unchanged.
+
+## 6. Phase B result: beginner mode (2026-10-20, not committed, not released)
+
+**Guided menu** (`cli/src/menu.ts`):
+- **When it appears:** `crawler-free` with nothing after it, when stdin, stdout and stderr are all a terminal. With any argument, or in a pipe or script, it behaves as before: help on stderr and exit code 2, with no questions.
+- **The choices:**
+  1. read one web page (the default)
+  2. read a whole website
+  3. look up facts
+  4. check or change the setup
+  5. help and examples
+- **How it asks:** only for what each choice needs, as numbered answers where Enter takes the default.
+- **How it runs:** each choice becomes an ordinary command (`scrape`, `crawl`, `extract`, `doctor`, `setup`), so limits, safety checks, messages and exit codes are those of the typed commands.
+- **Stopping:** three unclear answers end the program with exit code 2, which also covers input that has ended (no endless loop). Ctrl+C at any question stops it as before (exit 130, nothing changed).
+
+**Where it saves (E4)** (`cli/src/places.ts`):
+- **The default:** `<Documents>/Crawler Free`, where Documents is OneDrive's on Windows when OneDrive keeps it, `XDG_DOCUMENTS_DIR` on Linux, otherwise `~/Documents`, and the home folder if none exists.
+- **Other choices:** "this folder" (`./crawler-free-output`) or a typed folder.
+- **Messages:** the full path is printed. Explicit commands still save to `./crawler-free-output/`.
+
+**Opening the folder (E5)** (`cli/src/open.ts`):
+- **When:** "What next?" offers "Open the folder" after a successful save. "Exit" is the default, and "Do something else" goes back to the menu.
+- **How:** it starts the system's file manager (`explorer.exe`, `open` or `xdg-open`) with `execFile`, the folder as its only argument, and no shell.
+- **The test:** the security test now allows `child_process` only in `open.ts`, checks it uses one `execFile` with that fixed program list, and still bans `exec`, `spawn`, `fork`, `shell:` and `eval` everywhere.
+
+**`doctor`:**
+- **Summary:** it ends with "Everything looks ready." or "N check(s) failed. Fix the first one above, then run `crawler-free doctor` again."
+- **Next steps:** network failures, timeouts and a broken settings file each get one plain next step (other websites, try again in a minute, `crawler-free setup --reset`).
+
+**Help** mentions the menu.
+
+| Files | Change |
+|---|---|
+| `cli/src/menu.ts`, `places.ts`, `open.ts` (new) | Menu, Documents folder, folder opener |
+| `cli/src/main.ts`, `bin.ts`, `node.d.ts` | Starting the menu (no arguments, all terminals), help line, types |
+| `cli/src/doctor.ts` | Next steps and summary |
+| `cli/test/menu.test.ts` (new) | 12 tests (below) |
+| `cli/test/commands.test.ts`, `scrape.test.ts` | doctor wording; the narrowed no-shell rule |
+
+The 12 menu tests cover:
+- the Enter-only path to Documents
+- the opener, called only when chosen
+- "this folder" and a typed folder with spaces and accents
+- website and facts choices
+- the setup check
+- going back to the menu, and help
+- an unusable address asked again with the reason
+- three unclear answers, and input that has ended
+- no menu for pipes, arguments, or without a terminal
+- the Documents folder rules (the Windows and Linux ones run on their own systems)
+
+**Checks:**
+- `npm run typecheck` passed; `npm test` 44/44.
+- `npm run typecheck:cli` passed; `npm run test:cli` 91 passed, 3 skipped (the symbolic-link and Linux-only tests, which CI runs).
+- Both builds passed; `public/` is unchanged.
+- `npm audit --omit=dev` found 0 vulnerabilities; the npm package contents are unchanged.
+
+**Not verified:**
+- **In a real terminal:** started with the built CLI in a Terminal panel tab, the menu appeared with the hosted-service line and its five choices. Answering in that terminal, Ctrl+C at a question, and the file manager actually opening were not tried (skipped by the owner); the tests cover them with scripted answers.
+- **Reaching users:** the changes need a CLI release (npm and standalone) before anyone gets them.

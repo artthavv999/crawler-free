@@ -2,6 +2,7 @@ import { homedir } from "node:os";
 import { createInterface } from "node:readline/promises";
 import { isSea } from "node:sea";
 import { main } from "./main";
+import { openFolder } from "./open";
 
 // Questions (such as "replace this file?") are only asked when a person is at the terminal; scripts never block.
 // Ctrl+C at a question stops the program (exit 130) before anything is saved; end of input (Ctrl+D, or Ctrl+Z then
@@ -33,6 +34,8 @@ main({
   stdout: (s) => { process.stdout.write(s); },
   stderr: (s) => { process.stderr.write(s); },
   ask: interactive ? ask : undefined,
+  stdoutIsTTY: Boolean(process.stdout.isTTY),
+  openFolder: (dir) => openFolder(dir, process.platform),
 }).then((code) => {
   process.exitCode = code;
 });

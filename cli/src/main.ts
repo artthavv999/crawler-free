@@ -5,6 +5,7 @@ import { crawl, type Clock } from "./crawl";
 import { doctor } from "./doctor";
 import { CliError, EXIT } from "./errors";
 import { extract } from "./extract";
+import { menu } from "./menu";
 import type { Ask } from "./output";
 import { scrape } from "./scrape";
 import { setup } from "./setup";
@@ -15,6 +16,7 @@ export const HELP = `crawler-free ${VERSION}: read web pages as clean Markdown, 
 
 Usage
   crawler-free <command> [options]
+  crawler-free             (on its own, in a terminal: a guided menu that asks what to do)
 
 Commands
   scrape <url>        Read one page and save it as a file
@@ -99,6 +101,10 @@ export interface Deps extends Io {
   ask?: Ask;
   // Waiting between crawl progress checks; tests replace it.
   clock?: Clock;
+  // True when stdout is a terminal too: the guided menu needs a person on both ends.
+  stdoutIsTTY?: boolean;
+  // Opens a folder in the system's file manager (only the guided menu uses it).
+  openFolder?: (dir: string) => Promise<boolean>;
 }
 
 const realClock: Clock = { sleep: (ms) => new Promise((r) => setTimeout(r, ms)), now: () => Date.now() };
@@ -106,6 +112,14 @@ const realClock: Clock = { sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
 export async function main(d: Deps): Promise<number> {
   let ui = new Ui(d, { json: d.argv.includes("--json"), quiet: false });
   try {
+    // Nothing after the command, with a person at a terminal: the guided menu. Its choices run as ordinary commands.
+    if (d.argv.length === 0 && d.ask && d.stdoutIsTTY) {
+      return await menu({
+        ask: d.ask, stderr: d.stderr, stdout: d.stdout, cwd: d.cwd, help: HELP, openFolder: d.openFolder,
+        sys: { platform: d.platform, env: d.env, homedir: d.homedir },
+        run: (argv) => main({ ...d, argv }),
+      });
+    }
     const a = parse(d.argv);
     ui = new Ui(d, { json: a.json, quiet: a.quiet });
     if (a.version) {

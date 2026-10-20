@@ -50,6 +50,13 @@ declare module "node:fs" {
   export const constants: { W_OK: number; R_OK: number };
 }
 
+declare module "node:child_process" {
+  export function execFile(file: string, args: string[], callback: (error: unknown) => void): {
+    once(event: "spawn" | "error", listener: (...args: unknown[]) => void): void;
+    unref(): void;
+  };
+}
+
 declare module "node:sea" {
   export function isSea(): boolean;
 }
@@ -59,7 +66,7 @@ declare module "node:os" {
 }
 
 declare module "node:path" {
-  interface PathApi { join(...parts: string[]): string; dirname(p: string): string; resolve(...parts: string[]): string }
+  interface PathApi { join(...parts: string[]): string; dirname(p: string): string; resolve(...parts: string[]): string; isAbsolute(p: string): boolean }
   export const win32: PathApi;
   export const posix: PathApi;
   export function join(...parts: string[]): string;

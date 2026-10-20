@@ -16,6 +16,19 @@ const NO_SUCH_JOB = "00000000-0000-4000-8000-000000000000";
 const asCli = (e: unknown) => (e instanceof CliError ? e : new CliError(String((e as Error)?.message ?? e), EXIT.failed, "INTERNAL"));
 const failed = (name: string, e: unknown): Check => { const c = asCli(e); return { name, ok: false, detail: c.message, hint: c.hint, exitCode: c.exitCode }; };
 
+// One plain next step for the failures people hit most (docs/beginner-cli-plan.md, Phase B); others keep their hint.
+const NEXT_STEP: Record<string, string> = {
+  NETWORK: "Check that other websites open. If they do, the service may be briefly down: try again in a few minutes.",
+  TIMEOUT: "The service didn't answer in time. Check your connection and try again in a minute, or allow longer with --timeout.",
+  CONFIG_INVALID: "Run `crawler-free setup --reset` to remove the settings file and go back to the hosted service.",
+  CONFIG_UNREADABLE: "Run `crawler-free setup --reset` to remove the settings file and go back to the hosted service.",
+};
+const failedWithNextStep = (name: string, e: unknown): Check => {
+  const c = failed(name, e);
+  const step = NEXT_STEP[asCli(e).code];
+  return step ? { ...c, hint: step } : c;
+};
+
 export interface DoctorOptions {
   sys: System;
   cwd: string;
@@ -44,7 +57,7 @@ export async function doctor(o: DoctorOptions): Promise<number> {
     const saved = await readConfig(o.sys);
     checks.push({ name: "settings", ok: true, detail: saved ? `Settings file ${configPath(o.sys)} (${saved.mode})` : "No settings saved; the hosted service is used" });
   } catch (e) {
-    checks.push(failed("settings", e));
+    checks.push(failedWithNextStep("settings", e));
   }
 
   let apiUrl: string | undefined;
@@ -65,7 +78,9 @@ export async function doctor(o: DoctorOptions): Promise<number> {
   } else {
     o.ui.out(`Crawler Free doctor (CLI ${o.version})\n`);
     for (const c of checks) o.ui.out(`  ${c.ok ? "ok  " : "FAIL"}  ${c.detail}\n${c.hint ? `        ${c.hint}\n` : ""}`);
-    o.ui.out(bad.length ? `${bad.length} check${bad.length > 1 ? "s" : ""} failed.\n` : "All checks passed.\n");
+    o.ui.out(bad.length
+      ? `${bad.length} check${bad.length > 1 ? "s" : ""} failed. Fix the first one above, then run \`crawler-free doctor\` again.\n`
+      : "Everything looks ready.\n");
   }
   return bad.length ? (bad[0].exitCode ?? EXIT.failed) : EXIT.ok;
 }
@@ -84,7 +99,7 @@ export async function serviceChecks(client: ApiClient, source?: string): Promise
     const connection: Check = { name: "connection", ok: true, detail: `Reached ${apiUrl} (HTTP ${res.status}, ${Date.now() - started} ms${source ? `; address from ${source}` : ""})` };
     return [connection, await apiCheck(client)];
   } catch (e) {
-    return [failed("connection", e)];
+    return [failedWithNextStep("connection", e)];
   }
 }
 

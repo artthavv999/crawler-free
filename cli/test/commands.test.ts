@@ -57,7 +57,7 @@ describe("crawler-free doctor", () => {
     expect(r.stderr).toBe("");
     expect(r.stdout).toContain(`Crawler Free doctor (CLI ${VERSION})`);
     expect(r.stdout.match(/^ {2}ok {4}/gm)).toHaveLength(5);
-    expect(r.stdout).toContain("All checks passed.");
+    expect(r.stdout).toContain("Everything looks ready.");
     expect(m.hits.map((h: Hit) => `${h.method} ${h.url}`)).toEqual(["GET /", "GET /v2/crawl/00000000-0000-4000-8000-000000000000"]);
   });
 
@@ -110,8 +110,9 @@ describe("crawler-free doctor", () => {
     await writeFile(settings, "{oops");
     const broken = await run(["doctor", "--api-url", m.url], { env, homedir: home, cwd: home });
     expect(broken.code).toBe(EXIT.usage);
-    expect(broken.stdout).toContain("isn't valid JSON");
-    expect(broken.stdout).toContain(`Delete it to go back to the hosted service: ${settings}`);
+    expect(broken.stdout).toContain(`The settings file ${settings} isn't valid JSON.`);
+    expect(broken.stdout).toContain("Run `crawler-free setup --reset` to remove the settings file and go back to the hosted service.");
+    expect(broken.stdout).toContain("1 check failed. Fix the first one above, then run `crawler-free doctor` again.");
     expect(broken.stdout).toContain(`ok    Reached ${m.url}`); // --api-url still lets the connection be checked
 
     const gone = await run(["doctor", "--api-url", m.url], { cwd: join(home, "no-such-folder") });

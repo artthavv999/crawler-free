@@ -226,6 +226,13 @@ it("never runs shell commands or evaluates code (security regression)", async ()
   const dir = new URL("../src/", import.meta.url);
   for (const f of await readdir(dir)) {
     const src = await readFile(new URL(f, dir), "utf8");
-    expect(src, f).not.toMatch(/child_process|\beval\s*\(|new Function\s*\(|\bexecSync\b|\bspawn\s*\(/);
+    expect(src, f).not.toMatch(/\beval\s*\(|new Function\s*\(|\bexecSync\b|\bspawn(Sync)?\s*\(|\bexec\s*\(|\bfork\s*\(|\bshell\s*:/);
+    // The only program the CLI ever starts: the system's file manager, from open.ts, with execFile (no shell).
+    // (node.d.ts only declares its types.)
+    if (f !== "open.ts" && f !== "node.d.ts") expect(src, f).not.toMatch(/child_process/);
   }
+  const open = await readFile(new URL("open.ts", dir), "utf8");
+  expect(open.match(/execFile\(/g)).toHaveLength(1);
+  expect(open).toMatch(/\{ win32: "explorer\.exe", darwin: "open" \}/);
+  expect(open).toMatch(/\?\? "xdg-open"/);
 });
