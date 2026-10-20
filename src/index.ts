@@ -1,5 +1,5 @@
 import { crawlPage, crawlStatus, startCrawl, type CrawlMsg } from "./crawl";
-import { ApiError, readCapped } from "./guard";
+import { ApiError, checkUrl, readCapped } from "./guard";
 import { assertShared, clientKey, rateLimit, SHARED, sharedLeft, spendShared, subnetKey } from "./limits";
 import { scrape, type Formats } from "./scrape";
 import { asText, createSetup, loadSetup, runSetup, SETUP_TTL } from "./setups";
@@ -36,14 +36,15 @@ function fromOtherSite(req: Request, origin: string): boolean {
   return from !== null && from !== origin;
 }
 
-// Every page read (scrape or saved-setup run): per connection 20 a minute and 1,000 a day, then one unit of the shared
-// daily budget. A shared budget already known to be used up refuses first, before anyone's own allowance is spent.
+// Every valid page read (scrape or saved-setup run), cached or not, counts against the caller: 20 a minute and 1,000 a
+// day per connection. Callers check the request first, so a malformed or refused one spends nothing (audit finding B).
 async function pageRead(db: D1Database, client: string): Promise<void> {
-  assertShared("page-reads", SHARED.pageReads);
   await rateLimit(db, "scrape", client, 20, 60);
   await rateLimit(db, "scrape-day", client, 1000, 86400);
-  await spendShared(db, "page-reads", SHARED.pageReads);
 }
+// The shared daily budget is spent only by a fresh read (a cache miss), just before the page is fetched: an answer from
+// the cache does no outside work. Passed to scrape() as its onMiss step.
+const freshRead = (db: D1Database) => () => spendShared(db, "page-reads", SHARED.pageReads);
 
 const tooLarge = () => new ApiError(413, "PAYLOAD_TOO_LARGE", `request body is larger than ${MAX_BODY / 1024} KB`);
 
@@ -101,27 +102,32 @@ async function handle(req: Request, env: Env): Promise<Response> {
     }
     const client = clientKey(req.headers.get("cf-connecting-ip") ?? "unknown");
     if (req.method === "POST" && pathname === "/v2/scrape") {
-      await pageRead(env.DB, client);
+      assertShared("page-reads", SHARED.pageReads); // already known to be used up today: refuse before anything else
       const warn: string[] = [];
       const body = await readBody(req, ["url", "formats"], warn);
       const f = parseFormats(body.formats, warn);
-      const { doc, hit } = await scrape(env, body.url, f, host, client);
+      checkUrl(body.url, host); // the address's shape only (no network); a refused request has spent nothing
+      await pageRead(env.DB, client);
+      const { doc, hit } = await scrape(env, body.url, f, host, client, freshRead(env.DB));
       if (warn.length) doc.warning = warn.join("; ");
       return json(200, { success: true, data: doc }, { "x-cache": hit ? "HIT" : "MISS" });
     }
     if (req.method === "POST" && pathname === "/v2/crawl") {
       // Today's shared crawl-page budget first (a read), then 5 a day per connection and 10 per network (IPv4 /24, IPv6 /48).
       // Pages are charged to the shared budget as they are queued (claim() in crawl.ts).
+      // The request is checked before either limit, so a malformed or refused one spends nothing (audit finding B).
       await sharedLeft(env.DB, "crawl-pages", SHARED.crawlPages);
-      await rateLimit(env.DB, "crawl", client, 5, 86400);
-      await rateLimit(env.DB, "crawl-net", subnetKey(client), 10, 86400);
       const warn: string[] = [];
       const body = await readBody(req, ["url", "limit", "maxDiscoveryDepth", "scrapeOptions"], warn);
       const so = (body.scrapeOptions ?? {}) as Record<string, unknown>;
       const extra = Object.keys(so).filter((k) => k !== "formats");
       if (extra.length) warn.push(`ignored unsupported scrapeOptions: ${extra.join(", ")}`);
       const lim = clamp(body.limit, 10, 1, 100, "limit", warn), depth = clamp(body.maxDiscoveryDepth, 2, 0, 3, "maxDiscoveryDepth", warn);
-      const started = await startCrawl(env, body.url, lim, depth, parseFormats(so.formats, warn, false), host, origin);
+      const f = parseFormats(so.formats, warn, false);
+      checkUrl(body.url, host);
+      await rateLimit(env.DB, "crawl", client, 5, 86400);
+      await rateLimit(env.DB, "crawl-net", subnetKey(client), 10, 86400);
+      const started = await startCrawl(env, body.url, lim, depth, f, host, origin);
       return json(200, { ...started, ...(warn.length && { warning: warn.join("; ") }) });
     }
     if (req.method === "POST" && pathname === "/v2/setups") {
@@ -137,9 +143,10 @@ async function handle(req: Request, env: Env): Promise<Response> {
       return json(200, { success: true });
     }
     if (sid && kind === "run" && req.method === "GET") { // one-step re-run of a saved setup; same limits as a scrape
+      assertShared("page-reads", SHARED.pageReads);
+      const s = await loadSetup(env, sid); // an unknown setup spends nothing
       await pageRead(env.DB, client);
-      const s = await loadSetup(env, sid);
-      const { doc, hit } = await runSetup(env, s, host, client);
+      const { doc, hit } = await runSetup(env, s, host, client, freshRead(env.DB));
       const headers = { "x-cache": hit ? "HIT" : "MISS" };
       if (searchParams.get("format") === "json") return json(200, { success: true, data: doc }, headers);
       return new Response(asText(doc, s.mode), { headers: { "content-type": "text/plain; charset=utf-8", ...headers } });

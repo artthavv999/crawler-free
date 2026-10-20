@@ -80,7 +80,7 @@ PowerShell: `Invoke-RestMethod -Method Post -Uri https://crawler-free.crawler-fr
 | Crawl status polls | 60 per minute and 2,000 per 24 h (`skip` capped at 100) |
 | Removing setups | 30 per minute |
 | Page size / time | 5 MB, 15 s, at most 5 redirects |
-| JavaScript pages | Rendered by Cloudflare Browser Run only when static HTML is near-empty; one page every 10 s and a small shared daily budget (`RENDER_BUSY` with `Retry-After: 10`, or `RENDER_BUDGET_EXHAUSTED`); crawls retry busy pages themselves |
+| JavaScript pages | **Rendering is switched off on the hosted service for now** (since 20 Oct 2026, for a security review): pages that show no text without JavaScript answer `503 RENDER_BUDGET_EXHAUSTED`. When it's on, they're rendered by Cloudflare Browser Run only when static HTML is near-empty; one page every 10 s and a small shared daily budget (`RENDER_BUSY` with `Retry-After: 10`, or `RENDER_BUDGET_EXHAUSTED`); crawls retry busy pages themselves |
 | Cache | Results cached 1 h by normalised URL + formats |
 | Retention | Crawl results deleted after 24 h; saved setups (address + settings only) after 30 days unused; no permanent archive; Workers logs kept 3 days |
 

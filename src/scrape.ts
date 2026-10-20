@@ -146,13 +146,16 @@ async function render(env: Env, url: URL): Promise<string> {
 }
 
 // `client` is the caller's rate-limit key: the AI limit is charged only on a cache miss, when the model really runs.
-export async function scrape(env: Env, rawUrl: string, f: Formats, selfHost: string, client = ""): Promise<{ doc: Doc; hit: boolean }> {
+// `onMiss` runs once on a cache miss, before any fetch: direct reads spend the shared page-read budget there
+// (crawl pages were already charged to their own budget when they were queued).
+export async function scrape(env: Env, rawUrl: string, f: Formats, selfHost: string, client = "", onMiss?: () => Promise<void>): Promise<{ doc: Doc; hit: boolean }> {
   const norm = normUrl(checkUrl(rawUrl, selfHost));
   const key = [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify([norm, f]))))]
     .map((b) => b.toString(16).padStart(2, "0")).join("");
   const now = Math.floor(Date.now() / 1000);
   const cached = await env.DB.prepare("SELECT body FROM cache WHERE k = ? AND expires > ?").bind(key, now).first<string>("body");
   if (cached) return { doc: JSON.parse(cached), hit: true };
+  await onMiss?.();
   if (f.json) { // 20 a day per connection, 60 per network (IPv4 /24, IPv6 /48): the AI budget is shared by everyone
     await rateLimit(env.DB, "json", client, 20, 86400);
     await rateLimit(env.DB, "json-net", subnetKey(client), 60, 86400);

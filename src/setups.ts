@@ -16,10 +16,16 @@ const formatsFor = (s: Setup): Formats =>
   s.mode === "links" ? { links: true } : s.mode === "facts" ? { json: { schema: factsSchema(JSON.parse(s.fields)) } } : { markdown: true };
 
 // Plain text so a terminal prints it directly: the page text, one link per line, or "name: answer" lines.
+// The terminal is the last stop, so anything that could steer it goes here (audit finding C): control characters other
+// than tab and newline (ESC sequences, C1 such as CSI), bidi overrides and zero-width characters are removed, and a
+// carriage return becomes a newline so it can't overwrite what's already on screen. AI facts are covered too.
+// ?format=json and the cache keep the data exactly.
+const TERMINAL_UNSAFE = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f​-‏‪-‮⁠-⁤⁦-⁩﻿]/g;
+export const forTerminal = (text: string) => text.replace(/\r\n?/g, "\n").replace(TERMINAL_UNSAFE, "");
 export function asText(doc: Doc, mode: Mode): string {
-  if (mode === "links") return (doc.links ?? []).join("\n");
-  if (mode === "facts") return Object.entries((doc as { json?: Record<string, unknown> }).json ?? {}).map(([k, v]) => `${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`).join("\n");
-  return doc.markdown ?? "";
+  if (mode === "links") return forTerminal((doc.links ?? []).join("\n"));
+  if (mode === "facts") return forTerminal(Object.entries((doc as { json?: Record<string, unknown> }).json ?? {}).map(([k, v]) => `${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`).join("\n"));
+  return forTerminal(doc.markdown ?? "");
 }
 
 export async function createSetup(env: Env, body: Record<string, unknown> & { url: string }, self: string, origin: string) {
@@ -44,7 +50,7 @@ export async function loadSetup(env: Env, id: string): Promise<Setup> {
   return s;
 }
 
-export async function runSetup(env: Env, s: Setup, self: string, client: string): Promise<{ doc: Doc; hit: boolean }> {
+export async function runSetup(env: Env, s: Setup, self: string, client: string, onMiss?: () => Promise<void>): Promise<{ doc: Doc; hit: boolean }> {
   await env.DB.prepare("UPDATE setups SET last_run = ? WHERE id = ?").bind(Math.floor(Date.now() / 1000), s.id).run();
-  return scrape(env, s.url, formatsFor(s), self, client);
+  return scrape(env, s.url, formatsFor(s), self, client, onMiss);
 }
