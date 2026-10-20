@@ -1,5 +1,6 @@
 import { homedir } from "node:os";
 import { createInterface } from "node:readline/promises";
+import { isSea } from "node:sea";
 import { main } from "./main";
 
 // Questions (such as "replace this file?") are only asked when a person is at the terminal; scripts never block.
@@ -28,6 +29,7 @@ main({
   homedir: homedir(),
   cwd: process.cwd(),
   nodeVersion: process.versions.node,
+  standalone: isSea(),
   stdout: (s) => { process.stdout.write(s); },
   stderr: (s) => { process.stderr.write(s); },
   ask: interactive ? ask : undefined,

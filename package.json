@@ -11,7 +11,8 @@
     "build:ui": "node ui/build.mjs",
     "typecheck:cli": "tsc -p cli",
     "test:cli": "vitest run --config cli/vitest.config.ts",
-    "build:cli": "node cli/build.mjs"
+    "build:cli": "node cli/build.mjs",
+    "build:cli-binary": "node cli/build-sea.mjs"
   },
   "dependencies": {
     "robots-parser": "3.0.1"

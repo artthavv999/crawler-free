@@ -48,6 +48,10 @@ declare module "node:fs" {
   export const constants: { W_OK: number; R_OK: number };
 }
 
+declare module "node:sea" {
+  export function isSea(): boolean;
+}
+
 declare module "node:os" {
   export function homedir(): string;
 }

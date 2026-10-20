@@ -92,6 +92,8 @@ export interface Deps extends Io {
   homedir: string;
   cwd: string;
   nodeVersion: string;
+  // True in the standalone download, which has Node.js built in.
+  standalone?: boolean;
   fetch?: Fetch;
   // Present only in an interactive terminal: asks a question and returns the answer.
   ask?: Ask;
@@ -122,7 +124,7 @@ export async function main(d: Deps): Promise<number> {
     const sys = { platform: d.platform, env: d.env, homedir: d.homedir };
     if (a.command === "doctor") {
       checkOptionsFor("doctor", a);
-      return await doctor({ sys, cwd: d.cwd, nodeVersion: d.nodeVersion, apiUrlFlag: a.apiUrl, timeoutMs: a.timeoutMs, fetch: d.fetch, ui, version: VERSION });
+      return await doctor({ sys, cwd: d.cwd, nodeVersion: d.nodeVersion, standalone: d.standalone, apiUrlFlag: a.apiUrl, timeoutMs: a.timeoutMs, fetch: d.fetch, ui, version: VERSION });
     }
     if (a.command === "scrape") {
       checkOptionsFor("scrape", a);

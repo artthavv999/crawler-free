@@ -75,6 +75,7 @@ Good to know:
 - **Your files are safe:** it never replaces a file without asking you first.
 - **No setup needed:** it uses the free hosted service. `crawler-free setup` is only for choosing your own copy of Crawler Free instead, and has nothing to do with the web page's saved setups.
 - **Shorter commands:** to type just `crawler-free` instead of `npx crawler-free`, install it once with `npm install --global crawler-free`.
+- **No Node.js?** Download the standalone program for your system from the [Releases page](https://github.com/artthavv999/crawler-free/releases) instead; [cli/README.md](cli/README.md#standalone-downloads-no-nodejs-needed) shows how to run it and what to do about the security warning the first time.
 - **Every option:** `npx crawler-free --help` lists them all, and [cli/README.md](cli/README.md) is the full reference.
 
 ---

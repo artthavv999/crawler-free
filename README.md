@@ -26,6 +26,7 @@ npx crawler-free extract https://books.toscrape.com/catalogue/a-light-in-the-att
 - **Results** go into `./crawler-free-output/`, named after each page's address. An existing file is never replaced without asking.
 - **If something fails,** run `npx crawler-free doctor`. It checks your setup and the connection, and says what to fix.
 - **More:** [cli/README.md](cli/README.md) has every command, option and exit code, and [GUIDE.md](GUIDE.md) has a beginner's walk-through. The package is [crawler-free on npm](https://www.npmjs.com/package/crawler-free).
+- **No Node.js?** Each [release](https://github.com/artthavv999/crawler-free/releases) has a standalone program for Windows, macOS and Linux with Node.js built in. [cli/README.md](cli/README.md#standalone-downloads-no-nodejs-needed) explains how to run and verify it.
 - **From this repository's code instead:** run `npm ci` and `npm run build:cli`, then use `node cli/dist/crawler-free.mjs` in place of `npx crawler-free`.
 
 ## From your own code

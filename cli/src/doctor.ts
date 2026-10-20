@@ -20,6 +20,7 @@ export interface DoctorOptions {
   sys: System;
   cwd: string;
   nodeVersion: string;
+  standalone?: boolean;
   apiUrlFlag?: string;
   timeoutMs: number;
   fetch?: Fetch;
@@ -33,7 +34,9 @@ export async function doctor(o: DoctorOptions): Promise<number> {
   const checks: Check[] = [];
 
   const major = Number(o.nodeVersion.split(".")[0]);
-  checks.push(major >= MIN_NODE
+  checks.push(o.standalone
+    ? { name: "node", ok: true, detail: `Standalone build, with Node.js ${o.nodeVersion} built in` }
+    : major >= MIN_NODE
     ? { name: "node", ok: true, detail: `Node.js ${o.nodeVersion} (${MIN_NODE} or newer needed)` }
     : { name: "node", ok: false, detail: `Node.js ${o.nodeVersion} is too old; ${MIN_NODE} or newer is needed.`, hint: "Install the current LTS version from https://nodejs.org", exitCode: EXIT.failed });
 

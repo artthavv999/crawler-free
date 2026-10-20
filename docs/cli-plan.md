@@ -412,3 +412,59 @@ Later, optionally: publishing from GitHub Actions with npm's trusted publishing 
 **Not verified:**
 - macOS (Linux is covered by CI).
 - The real interactive prompts (as in Phase 5).
+
+## 10. Phase 7 result: standalone downloads (2026-10-20, not committed, nothing released)
+
+**D11. Packaging: Node.js's own single executable applications** (`node --build-sea`, Node 25.5 or newer).
+- **How it works:** the CLI, bundled as CommonJS, goes inside a copy of the official Node binary. No third-party code is added, which keeps D2's zero-dependency rule.
+- **Alternatives not taken:**
+  - `bun build --compile` or `deno compile` would ship a different runtime from the one the CLI is tested on.
+  - `pkg` and `nexe` are third-party and no longer maintained.
+- **Size:** about 100 MB per program, because Node is inside.
+
+**Build:** `npm run build:cli-binary` (`cli/build-sea.mjs`) builds for the computer it runs on, into `cli/dist/sea/`. It writes:
+- the program
+- `LICENSE`
+- `NODE-LICENSE.txt` (Node.js and the libraries inside it, which every copy must carry). It's taken from beside `node`, or, when the Windows installer left it out, from Node's repository for the same version.
+
+It also signs the program ad hoc on macOS (macOS won't run unsigned programs), and checks that the built program reports the right version.
+
+**`doctor`** says "Standalone build, with Node.js X built in" instead of checking the Node version (`node:sea`'s `isSea()`; one new test, 76/76).
+
+**Release workflow** (`.github/workflows/cli-release.yml`):
+- **Trigger:** a `cli-vX.Y.Z` tag that matches `cli/package.json`.
+- **Build:** five runners: Linux x64 and ARM64, macOS Apple silicon and Intel, Windows x64. Each one runs `npm ci`, the CLI typecheck and tests, the build, and a check that the program runs and reports Node as built in. That check uses a closed local port, so nothing leaves the runner.
+- **Package:** `.zip` for Windows, `.tar.gz` elsewhere.
+- **Release:** `SHA256SUMS.txt`, GitHub build provenance (`actions/attest-build-provenance`), and a **draft** release made with the preinstalled `gh`. Nothing is public until you press Publish.
+- **By hand:** "Run workflow" only builds, tests, and keeps the archives as artifacts for 7 days, which makes it a dry run.
+- **Safety:**
+  - Actions are pinned to commits at least 14 days old (download-artifact v8.0.1, not the 13-day-old v8.0.2).
+  - No dependency cache in release builds.
+  - Read-only by default; only the release job may write, sign provenance, and create the draft.
+
+**Not signed with a paid certificate (your decision).** Windows SmartScreen and macOS Gatekeeper warn on first run. `cli/README.md` explains the warnings and how to check a download first (checksums, `gh attestation verify`). Removing the warnings needs a Windows code-signing certificate and an Apple Developer ID; both cost money every year.
+
+| Files | Change |
+|---|---|
+| `cli/build-sea.mjs` (new), `package.json` | The build, and `build:cli-binary` |
+| `.github/workflows/cli-release.yml` (new) | The release workflow above |
+| `cli/src/bin.ts`, `main.ts`, `doctor.ts`, `node.d.ts`; `cli/test/commands.test.ts` | Standalone line in `doctor`, with a test |
+| `cli/README.md`, `README.md`, `GUIDE.md` | Downloading, first-run warnings, verifying, uninstalling |
+
+**Checks on Windows:**
+- **The program:** built 99 MB. With **no Node.js on the PATH**:
+  - `--version` printed `0.1.1`.
+  - `doctor` passed all five checks.
+  - `scrape https://example.com` saved the page.
+  - An unknown option still exited with code 2.
+  - No experimental-feature warning appeared.
+- **Signature:** after the build it reads "NotSigned" (Node's own signature is removed cleanly, not left broken).
+- **Workflow steps run locally:** the "runs on its own" check passes on the real program, and the release-notes step produces the right text (with `gh` replaced by `echo`).
+
+**Not verified yet** (the first workflow run will show these):
+- The macOS and Linux builds, and the macOS ad-hoc signing.
+- The workflow's YAML (no local parser; GitHub checks it on push).
+- SmartScreen and Gatekeeper behaviour on a real download.
+- `gh attestation verify`, which needs a first release.
+
+The program's Windows file details still say "Node.js" (changing them needs another tool).

@@ -60,6 +60,14 @@ describe("crawler-free doctor", () => {
     expect(m.hits.map((h: Hit) => `${h.method} ${h.url}`)).toEqual(["GET /", "GET /v2/crawl/00000000-0000-4000-8000-000000000000"]);
   });
 
+  it("says when it's the standalone download, which has Node.js built in", async () => {
+    const m = await api();
+    const r = await run(["doctor", "--api-url", m.url], { standalone: true, nodeVersion: "26.1.0" });
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain("  ok    Standalone build, with Node.js 26.1.0 built in\n");
+    expect(r.stdout).not.toContain("or newer needed");
+  });
+
   it("prints machine-readable results with --json", async () => {
     const m = await api();
     const r = await run(["doctor", "--json", "--api-url", m.url]);
