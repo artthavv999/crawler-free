@@ -425,7 +425,7 @@ Later, optionally: publishing from GitHub Actions with npm's trusted publishing 
 **Build:** `npm run build:cli-binary` (`cli/build-sea.mjs`) builds for the computer it runs on, into `cli/dist/sea/`. It writes:
 - the program
 - `LICENSE`
-- `NODE-LICENSE.txt` (Node.js and the libraries inside it, which every copy must carry). It's taken from beside `node`, or, when the Windows installer left it out, from Node's repository for the same version.
+- `NODE-LICENSE.txt` (Node.js and the libraries inside it, which every copy must carry). It's taken from beside `node`, where Node's zip and tar downloads (and the CI runners) keep it. Nothing is downloaded: when the Windows installer left it out, set `NODE_LICENSE_FILE` to a copy of the same version's licence, or the build stops and says so. (Until 20 Oct 2026 the build downloaded it instead. CodeQL flagged that as network data written to a file, and none of the 0.2.0 release builds needed the download.)
 
 It also signs the program ad hoc on macOS (macOS won't run unsigned programs), and checks that the built program reports the right version.
 

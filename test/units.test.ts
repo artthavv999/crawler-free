@@ -79,6 +79,20 @@ it("extractor keeps content, skips chrome and hidden text, decodes entities, abs
   expect(r.metadata).toMatchObject({ title: "T & U", language: "en", ogSiteName: "S" });
 });
 
+it("extractor removes nested tags and comments completely, so none can reassemble (CodeQL multi-character sanitization)", async () => {
+  const cases = [
+    "<p>a<scr<i></i>ipt>alert(1)</scr<i></i>ipt>b</p>", // an empty <i></i> splits <script>
+    "<p>c<ifr<!-- -->ame src=https://x.example>d</p>", // a comment splits <iframe>
+    "<p>e<!<!-- x -->-- secret > leak -->f</p>", // a comment inside a comment, holding a ">"
+    "<pre><scr<b>ipt>code</scr<b>ipt></pre><p>g</p>", // the same inside a code block
+  ];
+  for (const html of cases) {
+    const { markdown } = await extract(`<html><body><main>${html}</main></body></html>`, new URL("https://x.example/"));
+    expect(markdown, html).not.toMatch(/<\s*(script|iframe)|<!--|-->/i);
+    expect(markdown, html).not.toMatch(/secret|leak/);
+  }
+});
+
 it("URL validator rejects SSRF targets and non-global DNS answers", () => {
   const targets = ["http://127.0.0.1/", "http://127.1/", "http://2130706433/", "http://0x7f000001/", "http://localhost/",
     "http://169.254.169.254/latest/meta-data/", "http://[::1]/", "http://[::ffff:127.0.0.1]/", "http://10.0.0.1/",

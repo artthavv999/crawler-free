@@ -44,8 +44,9 @@ describe("replacing files", () => {
     const r = await run(["scrape", "https://example.com/", "-o", "out.md", "--force", "--api-url", m.url], { cwd: home });
     expect(r.code).toBe(EXIT.ok);
     expect(await readFile(secret, "utf8")).toBe("keep me");
-    expect((await lstat(target)).isSymbolicLink()).toBe(false);
+    // Read first, then look at the path: checking a path and then reading it is a race (CodeQL js/file-system-race).
     expect(await readFile(target, "utf8")).toBe("# New\n");
+    expect((await lstat(target)).isSymbolicLink()).toBe(false);
     await noTempFiles(home);
   });
 

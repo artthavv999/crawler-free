@@ -33,6 +33,18 @@ const CHROME_SEL = CHROME_WORDS.flatMap((w) => [`[class*="${w}" i]`, `[id*="${w}
 const CHROME = /(^|\s)(nav|navbar|navigation|menu|dropdown|sidebar|header|footer|breadcrumbs?|cookies?|consent|share|sharing|social|popup|modal|overlay|newsletter|advert|banner|skip|jump)([-_\s]|$)|[-_](nav|navbar|navigation|menu|dropdown|breadcrumbs?|editsection|jump-link|skip-link)(\s|$)|(^|\s)(site|global)-(header|footer)(\s|$)/i;
 const HIDDEN_STYLE = /display\s*:\s*none|visibility\s*:\s*hidden|opacity\s*:\s*0(?![.\d])|font-size\s*:\s*0(?![.\d])/i;
 const TAG = /<(?:"[^"]*"|'[^']*'|[^'">])*>/g; // allows ">" inside quoted attribute values
+const COMMENT = /<!--[\s\S]*?-->/g;
+const EMPTY_INLINE = /<(i|b|em|strong|span|a|code)\b[^>]*>\s*<\/\1>/gi;
+// Removes every match, repeating until nothing more changes. One pass isn't enough: removing an inner piece can join
+// the text around it into a new tag or comment, as in "<scr<i></i>ipt>" or "<!<!---->--" (CodeQL
+// js/incomplete-multi-character-sanitization). Each pass only shortens the text, so the loop always ends.
+function removeAll(text: string, pattern: RegExp): string {
+  for (let before = ""; before !== text; ) {
+    before = text;
+    text = text.replace(pattern, "");
+  }
+  return text;
+}
 const HREF = /\shref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i; // leading \s skips data-href
 const SRC = /\ssrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i;
 const ALT = /\salt\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i;
@@ -84,11 +96,9 @@ export async function extract(html: string, url: URL) {
   for (const [t] of html.matchAll(/<a\s(?:"[^"]*"|'[^']*'|[^'">])*>/gi)) { const h = abs(attr(t, HREF)); if (/^https?:/.test(h)) links.add(h); }
 
   const pres: string[] = [];
-  let md = cleaned
-    .replace(/[\x00\x01]/g, "") // reserved below as placeholders; page text must not forge them
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/<pre\b[^>]*>([\s\S]*?)<\/pre>/gi, (_m, c: string) => `\x00${pres.push(decode(c.replace(TAG, "")).replace(/^\n+|\n+$/g, "")) - 1}\x00`)
-    .replace(/<(i|b|em|strong|span|a|code)\b[^>]*>\s*<\/\1>/gi, "") // icon <i></i>, empty links
+  let md = removeAll(cleaned.replace(/[\x00\x01]/g, ""), COMMENT) // \x00 and \x01 are placeholders below; page text must not forge them
+    .replace(/<pre\b[^>]*>([\s\S]*?)<\/pre>/gi, (_m, c: string) => `\x00${pres.push(decode(removeAll(c, TAG)).replace(/^\n+|\n+$/g, "")) - 1}\x00`);
+  md = removeAll(md, EMPTY_INLINE) // icon <i></i>, empty links
     .replace(/<img\b(?:"[^"]*"|'[^']*'|[^'">])*>/gi, (t) => { const s = abs(attr(t, SRC)); return /^https?:/.test(s) ? `![${attr(t, ALT)}](${s})` : ""; })
     .replace(/<a\b((?:"[^"]*"|'[^']*'|[^'">])*)>([\s\S]*?)<\/a>/gi, (_m, a: string, inner: string) => {
       const h = abs(attr(a, HREF));
@@ -104,8 +114,8 @@ export async function extract(html: string, url: URL) {
     .replace(/<hr\b[^>]*>/gi, `${N}${N}---${N}${N}`)
     .replace(/<\/?(?:strong|b)\b[^>]*>/gi, "**")
     .replace(/<\/?(?:em|i)\b[^>]*>/gi, "*")
-    .replace(/<\/?code\b[^>]*>/gi, "`")
-    .replace(TAG, "");
+    .replace(/<\/?code\b[^>]*>/gi, "`");
+  md = removeAll(md, TAG);
   md = decode(md).replace(/\s+/g, " ").replace(/ ?\x01 ?/g, "\n").replace(/\n{3,}/g, "\n\n")
     .replace(/\x00(\d+)\x00/g, (_m, i: string) => "\n\n```\n" + pres[+i] + "\n```\n\n").replace(/\n{3,}/g, "\n\n").trim();
   const metadata = Object.fromEntries(Object.entries({ title: decode(title), description: "", ...meta }).map(([k, v]) => [k, clean(v).replace(/\s+/g, " ").trim()]));

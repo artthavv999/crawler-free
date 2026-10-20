@@ -45,25 +45,23 @@ execFileSync(process.execPath, ["--build-sea", join(out, "sea-config.json")], { 
 if (process.platform === "darwin") execFileSync("codesign", ["--sign", "-", "--force", program], { stdio: "inherit" }); // macOS runs only signed programs; this is an ad-hoc signature
 
 // Licences: Crawler Free's, and Node's. Node's zip and tar downloads (and so the CI runners) keep LICENSE beside
-// node.exe on Windows and one folder up on macOS and Linux; the Windows installer leaves it out, so then the licence
-// of this exact Node version is taken from Node's own repository.
+// node.exe on Windows and one folder up on macOS and Linux. The Windows installer leaves it out: then point
+// NODE_LICENSE_FILE at a copy of the same version's LICENSE. Nothing is downloaded.
 await copyFile(here("./LICENSE"), join(out, "LICENSE"));
-await writeFile(join(out, "NODE-LICENSE.txt"), await nodeLicence());
+await copyFile(await nodeLicence(), join(out, "NODE-LICENSE.txt"));
 
 await rm(join(out, "crawler-free.cjs"));
 await rm(join(out, "sea-config.json"));
 
+// The path of Node.js's licence file for the Node running this build (checked to really be Node's licence).
 async function nodeLicence() {
-  for (const path of [join(dirname(process.execPath), "LICENSE"), join(dirname(process.execPath), "..", "LICENSE")]) {
+  const places = [process.env.NODE_LICENSE_FILE, join(dirname(process.execPath), "LICENSE"), join(dirname(process.execPath), "..", "LICENSE")];
+  for (const path of places.filter(Boolean)) {
     const text = await readFile(path, "utf8").catch(() => null);
-    if (text?.startsWith("Node.js is licensed for use as follows:")) return text;
+    if (text?.startsWith("Node.js is licensed for use as follows:")) return path;
   }
-  const url = `https://raw.githubusercontent.com/nodejs/node/v${process.versions.node}/LICENSE`;
-  const res = await fetch(url);
-  const text = res.ok ? await res.text() : "";
-  if (!text.startsWith("Node.js is licensed for use as follows:")) throw new Error(`Couldn't find Node.js's LICENSE beside ${process.execPath} or at ${url}`);
-  console.log(`Node.js's licence isn't installed beside node; took the v${process.versions.node} licence from ${url}`);
-  return text;
+  throw new Error(`Couldn't find Node.js's LICENSE beside ${process.execPath}. Use Node's zip or tar download, or set NODE_LICENSE_FILE `
+    + `to a copy of https://github.com/nodejs/node/blob/v${process.versions.node}/LICENSE`);
 }
 
 const output = execFileSync(program, ["--version"], { encoding: "utf8" }).trim();
