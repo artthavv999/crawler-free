@@ -88,7 +88,7 @@ it("extractor removes nested tags and comments completely, so none can reassembl
   ];
   for (const html of cases) {
     const { markdown } = await extract(`<html><body><main>${html}</main></body></html>`, new URL("https://x.example/"));
-    expect(markdown, html).not.toMatch(/<\s*(script|iframe)|<!--|-->/i);
+    expect(markdown, html).not.toContain("<"); // no tag or comment can start without one
     expect(markdown, html).not.toMatch(/secret|leak/);
   }
 });
