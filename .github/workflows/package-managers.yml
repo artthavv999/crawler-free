@@ -42,7 +42,8 @@ jobs:
           brew test local/crawler-free/crawler-free
           test -f "$(brew --prefix crawler-free)/NODE-LICENSE.txt"
           brew uninstall crawler-free
-          if command -v crawler-free; then echo "crawler-free is still installed"; exit 1; fi
+          hash -r # bash remembers where it found crawler-free; forget that before checking it's gone
+          if command -v crawler-free || [ -e "$(brew --prefix)/bin/crawler-free" ]; then echo "crawler-free is still installed"; exit 1; fi
 
   scoop:
     name: Scoop on Windows
