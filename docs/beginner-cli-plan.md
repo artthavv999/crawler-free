@@ -200,6 +200,6 @@ The 12 menu tests cover:
 - `npm audit --omit=dev` found 0 vulnerabilities; the npm package contents are unchanged (the generator isn't shipped).
 
 **Not verified yet:**
-- **The installs:** Homebrew and Scoop actually installing. The new workflow runs on the first push.
+- **The installs: now verified.** The workflow's second run (39412975093, commit `85cd908`) passed on every runner: Scoop on Windows, and Homebrew on Linux x64, macOS Intel and macOS Apple silicon. Each installed from the files in this repository, ran the program, passed its checks (`brew test` and the licence file for Homebrew, a matching `--version` for Scoop), and uninstalled cleanly. The first run (39412423786) had already installed with Homebrew, but failed on the test's own "is it gone?" check: bash remembers a command's path, which `hash -r` now clears.
 - **Desktop warnings:** whether Scoop installs avoid Windows' "downloaded from the internet" warnings on a real desktop. Homebrew never marks command-line formulas that way. The docs only promise what's certain.
 - **Which version you get:** the package managers install 0.1.2 until the next release. The guided menu and the clearer `doctor` from Phase B arrive with that release, after which `npm run cli:manifests` must be run and committed.
