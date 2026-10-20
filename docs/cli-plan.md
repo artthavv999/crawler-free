@@ -461,7 +461,13 @@ It also signs the program ad hoc on macOS (macOS won't run unsigned programs), a
 - **Signature:** after the build it reads "NotSigned" (Node's own signature is removed cleanly, not left broken).
 - **Workflow steps run locally:** the "runs on its own" check passes on the real program, and the release-notes step produces the right text (with `gh` replaced by `echo`).
 
-**Not verified yet** (the first workflow run will show these):
+**Dry run 1 (2026-10-20, run 39385421107, started by hand):**
+- **Passed:** Linux x64 and ARM64. On each, the tests passed, the program was built, it ran with Node built in, and it was packaged, in about 30 s.
+- **Failed:** macOS Apple silicon and Intel, in one CLI test. That test wrote its broken settings file to the Linux location, but on macOS the CLI correctly reads `~/Library/Application Support/crawler-free`.
+- **Not reached:** Windows was stopped early because the macOS jobs had failed.
+- **Fixed:** the test now asks `configPath` for the location. The regular CLI checks now also run on macOS (Node 24), so this is caught on every push.
+
+**Not verified yet** (the first full workflow run will show these):
 - The macOS and Linux builds, and the macOS ad-hoc signing.
 - The workflow's YAML (no local parser; GitHub checks it on push).
 - SmartScreen and Gatekeeper behaviour on a real download.

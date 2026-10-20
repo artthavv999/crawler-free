@@ -34,11 +34,14 @@ jobs:
           CRAWLER_WRANGLER_CONFIG: ./wrangler.ci.toml
 
   cli:
-    name: CLI on Node ${{ matrix.node }}
-    runs-on: ubuntu-latest
+    name: CLI on Node ${{ matrix.node }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os: [ubuntu-latest]
         node: [22, 24] # cli/package.json engines: >=22
+        include:
+          - { os: macos-15, node: 24 } # macOS keeps settings in another place; the release builds run there too
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

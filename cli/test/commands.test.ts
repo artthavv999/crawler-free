@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { configPath } from "../src/config";
 import { EXIT } from "../src/errors";
 import { VERSION } from "../src/version";
 import { healthyApi, mockApi, run, sendJson, type Hit } from "./helpers";
@@ -104,13 +105,13 @@ describe("crawler-free doctor", () => {
 
     const home = (await run(["--version"])).home;
     const env = { APPDATA: join(home, "AppData"), XDG_CONFIG_HOME: join(home, ".config") };
-    const dir = process.platform === "win32" ? join(env.APPDATA, "crawler-free") : join(env.XDG_CONFIG_HOME, "crawler-free");
-    await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, "config.json"), "{oops");
+    const settings = configPath({ platform: process.platform, env, homedir: home }); // differs on Windows, macOS and Linux
+    await mkdir(dirname(settings), { recursive: true });
+    await writeFile(settings, "{oops");
     const broken = await run(["doctor", "--api-url", m.url], { env, homedir: home, cwd: home });
     expect(broken.code).toBe(EXIT.usage);
     expect(broken.stdout).toContain("isn't valid JSON");
-    expect(broken.stdout).toContain(`Delete it to go back to the hosted service: ${join(dir, "config.json")}`);
+    expect(broken.stdout).toContain(`Delete it to go back to the hosted service: ${settings}`);
     expect(broken.stdout).toContain(`ok    Reached ${m.url}`); // --api-url still lets the connection be checked
 
     const gone = await run(["doctor", "--api-url", m.url], { cwd: join(home, "no-such-folder") });
