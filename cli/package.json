@@ -1,6 +1,6 @@
 {
   "name": "crawler-free",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Command line for Crawler Free: read web pages as clean Markdown, links or facts through the free hosted service.",
   "keywords": [
     "markdown",
