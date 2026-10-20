@@ -467,10 +467,21 @@ It also signs the program ad hoc on macOS (macOS won't run unsigned programs), a
 - **Not reached:** Windows was stopped early because the macOS jobs had failed.
 - **Fixed:** the test now asks `configPath` for the location. The regular CLI checks now also run on macOS (Node 24), so this is caught on every push.
 
-**Not verified yet** (the first full workflow run will show these):
-- The macOS and Linux builds, and the macOS ad-hoc signing.
-- The workflow's YAML (no local parser; GitHub checks it on push).
+**Dry run 2 (2026-10-20, run 39387829440, commit `dde822a`): all five builds passed.**
+
+| System | Time | Archive size |
+|---|---|---|
+| Windows x64 | 44 s | 38.2 MB |
+| macOS Apple silicon | 39 s | 44.3 MB |
+| macOS Intel | 106 s | 45.7 MB |
+| Linux x64 | 32 s | 47.1 MB |
+| Linux ARM64 | 31 s | 46.8 MB |
+
+Each build covered the tests, the build, macOS ad-hoc signing, the check that the program runs with Node built in, and packaging. The draft-release job was skipped, as it should be for a dry run.
+
+**Not verified yet** (the first tagged release will show these):
 - SmartScreen and Gatekeeper behaviour on a real download.
-- `gh attestation verify`, which needs a first release.
+- `gh attestation verify`.
+- The draft-release job itself.
 
 The program's Windows file details still say "Node.js" (changing them needs another tool).
