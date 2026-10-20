@@ -51,9 +51,14 @@ The next section shows the quickest way to do the same things from a terminal. A
 
 ## The quick terminal way: the `crawler-free` command
 
-If you're happy typing a command, `crawler-free` does everything the web page does and saves the results as files. It needs **Node.js 22 or newer**. If `node --version` shows nothing or a lower number, install the LTS version from https://nodejs.org.
+If you're happy typing a command, `crawler-free` does everything the web page does and saves the results as files. Open a terminal (see [Step 1](#step-1-open-a-terminal) below), then get the command in whichever of these ways suits you:
 
-Open a terminal (see [Step 1](#step-1-open-a-terminal) below) and type:
+- **You have Node.js 22 or newer** (`node --version` shows a number of 22 or more): there's nothing to install. Just put `npx` in front of each command, as below.
+- **No Node.js, on a Mac or Linux with [Homebrew](https://brew.sh):** type `brew tap artthavv999/crawler-free https://github.com/artthavv999/crawler-free`, then `brew install crawler-free`. After that, type `crawler-free` without `npx`.
+- **No Node.js, on Windows with [Scoop](https://scoop.sh):** type `scoop bucket add crawler-free https://github.com/artthavv999/crawler-free`, then `scoop install crawler-free`. After that, type `crawler-free` without `npx`.
+- **None of these?** The easiest is to install Node.js (the LTS version from https://nodejs.org) and use the first way.
+
+With Node.js, try:
 
 ```
 npx crawler-free scrape https://quotes.toscrape.com/
@@ -75,7 +80,7 @@ Good to know:
 - **Your files are safe:** it never replaces a file without asking you first.
 - **No setup needed:** it uses the free hosted service. `crawler-free setup` is only for choosing your own copy of Crawler Free instead, and has nothing to do with the web page's saved setups.
 - **Shorter commands:** to type just `crawler-free` instead of `npx crawler-free`, install it once with `npm install --global crawler-free`.
-- **No Node.js?** Download the standalone program for your system from the [Releases page](https://github.com/artthavv999/crawler-free/releases) instead; [cli/README.md](cli/README.md#standalone-downloads-no-nodejs-needed) shows how to run it and what to do about the security warning the first time.
+- **Downloading the program by hand** (from the [Releases page](https://github.com/artthavv999/crawler-free/releases)) is also possible, but it's for advanced users: [cli/README.md](cli/README.md#standalone-downloads-no-nodejs-needed) shows how to check the download is genuine before you run it. Never switch off your computer's security protection to run it.
 - **Every option:** `npx crawler-free --help` lists them all, and [cli/README.md](cli/README.md) is the full reference.
 
 ---

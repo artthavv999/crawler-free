@@ -10,7 +10,9 @@ That saves `./crawler-free-output/example.com.md` and prints where it went.
 
 ## Install
 
-You need [Node.js](https://nodejs.org) 22 or newer. `node --version` shows the one you have.
+Choose one; they all give you the same command.
+
+**With Node.js 22 or newer** (`node --version` shows the one you have):
 
 - **Without installing:** put `npx` in front of each command, as above. The first time, npx asks to download the package; type `y`.
 - **Installed once**, so you can type just `crawler-free`:
@@ -21,13 +23,22 @@ You need [Node.js](https://nodejs.org) 22 or newer. `node --version` shows the o
 
   On a Mac or Linux, if that fails with `EACCES`, use `npx` instead, or see [npm's guide to fixing permissions](https://docs.npmjs.com/resolving-eacces-permissions-errors-when-installing-packages-globally).
 
-The package has no dependencies: it's one file that uses only what comes with Node.js.
+The npm package has no dependencies: it's one file that uses only what comes with Node.js.
+
+**Without Node.js, with a package manager** (recommended): it installs the standalone program (Node.js built in) for your computer, checks it against the release's published checksum, puts it on your PATH and updates it. There's no unpacking or PATH editing to do yourself.
+
+| System | Install | Update | Remove |
+|---|---|---|---|
+| macOS or Linux, [Homebrew](https://brew.sh) | `brew tap artthavv999/crawler-free https://github.com/artthavv999/crawler-free`, then `brew install crawler-free` | `brew upgrade crawler-free` | `brew uninstall crawler-free` |
+| Windows, [Scoop](https://scoop.sh) | `scoop bucket add crawler-free https://github.com/artthavv999/crawler-free`, then `scoop install crawler-free` | `scoop update crawler-free` | `scoop uninstall crawler-free` |
+
+The formula and manifest live in this repository (`Formula/`, `bucket/`). Each download's checksum is taken from the release's published `SHA256SUMS.txt`, and the package manager checks it before installing.
 
 ## Standalone downloads (no Node.js needed)
 
-Each release on the [Releases page](https://github.com/artthavv999/crawler-free/releases) has a ready-to-run program for Windows, macOS and Linux. Node.js is built in, so each one is about 100 MB.
+For advanced users without a package manager. Each release on the [Releases page](https://github.com/artthavv999/crawler-free/releases) has a ready-to-run program for Windows, macOS and Linux, with Node.js built in, so each one is about 100 MB. **Check a download before you run it**, because these programs aren't signed with a paid certificate.
 
-1. **Download** the file for your system:
+1. **Download** the file for your system, and the release's `SHA256SUMS.txt`:
 
    | System | File |
    |---|---|
@@ -36,18 +47,18 @@ Each release on the [Releases page](https://github.com/artthavv999/crawler-free/
    | macOS, Intel | `crawler-free-<version>-macos-x64.tar.gz` |
    | Linux | `crawler-free-<version>-linux-x64.tar.gz` or `-linux-arm64.tar.gz` |
 
-2. **Unpack it** into a folder of your choice: on Windows, right-click it and choose **Extract All**; elsewhere, `tar -xzf crawler-free-*.tar.gz`.
-3. **Run it from a terminal in that folder:** `.\crawler-free.exe scrape https://example.com` on Windows, or `./crawler-free scrape https://example.com` on macOS and Linux. To run it from any folder, put it in a folder on your PATH.
+2. **Check it before unpacking:**
+   - **The checksum** must match the file's line in `SHA256SUMS.txt`. To compute it, use `certutil -hashfile <file> SHA256` on Windows, `shasum -a 256 <file>` on macOS, or `sha256sum <file>` on Linux. This proves the file is the one the release lists. It doesn't prove who made it, because a checksum list downloaded from the same place could be swapped too.
+   - **The build provenance** proves who made it. With the [GitHub CLI](https://cli.github.com), `gh attestation verify <file> --repo artthavv999/crawler-free` confirms that GitHub built that exact file from this repository's release workflow.
+3. **Unpack it** into a folder of your choice: on Windows, right-click it and choose **Extract All**; elsewhere, `tar -xzf crawler-free-*.tar.gz`.
+4. **Run it from a terminal in that folder:** `.\crawler-free.exe scrape https://example.com` on Windows, or `./crawler-free scrape https://example.com` on macOS and Linux. To run it from any folder, put it in a folder on your PATH.
 
-**The first time, your system may warn you.** The programs are built by GitHub from this repository, but not signed with a paid certificate:
-- **Windows** may show "Windows protected your PC". Choose **More info**, then **Run anyway**. Or, in PowerShell, run `Unblock-File .\crawler-free.exe` once.
-- **macOS** may say it "cannot be opened because the developer cannot be verified". Run `xattr -d com.apple.quarantine ./crawler-free` once, or allow it under **System Settings > Privacy & Security**.
+**What you may see the first time, and why:** Windows and macOS warn about programs from the internet that don't carry a paid signature.
+- **Windows:** you may see "Windows protected your PC". If you checked the download as above, you can allow this one program: **More info**, then **Run anyway**. In PowerShell, `Unblock-File .\crawler-free.exe` does the same for this one file.
+- **macOS:** you may see "cannot be opened because the developer cannot be verified". After checking it, allow this one program under **System Settings > Privacy & Security**, or run `xattr -d com.apple.quarantine ./crawler-free` once.
+- **Never** switch off SmartScreen, Gatekeeper or your antivirus to run it. If a warning won't go away for this one file, use a package manager or npm instead.
 
-Check that a download is genuine before you allow it:
-- **Checksum:** compare its checksum with the release's `SHA256SUMS.txt`. Use `certutil -hashfile <file> SHA256` on Windows, `shasum -a 256 <file>` on macOS, or `sha256sum <file>` on Linux.
-- **Build provenance:** with the [GitHub CLI](https://cli.github.com), `gh attestation verify <file> --repo artthavv999/crawler-free` confirms GitHub built that file from this repository.
-
-Each archive also holds `LICENSE` (Crawler Free's) and `NODE-LICENSE.txt` (Node.js's, since it's built in). To uninstall, delete the program; `crawler-free setup --reset` first removes its settings file, if you saved one.
+Each archive also holds `LICENSE` (Crawler Free's) and `NODE-LICENSE.txt` (Node.js's, since it's built in). To uninstall, run `crawler-free setup --reset` first if you saved settings, then delete the program.
 
 ## Commands
 
@@ -139,12 +150,19 @@ None are needed: with no settings, every command uses the hosted service.
 
 ## Uninstall
 
+First, if you saved settings with `crawler-free setup`, remove them:
+
 ```bash
 crawler-free setup --reset
-npm uninstall --global crawler-free
 ```
 
-The first line removes the settings file, if you saved one. Results in `crawler-free-output` folders are yours, and stay.
+Then remove the program the way you installed it:
+- npm: `npm uninstall --global crawler-free` (with npx there's nothing to remove)
+- Homebrew: `brew uninstall crawler-free`
+- Scoop: `scoop uninstall crawler-free`
+- a download: delete the program.
+
+Results in `crawler-free-output` folders are yours, and stay.
 
 ## Licence
 

@@ -8,26 +8,44 @@ Open **https://crawler-free.crawler-free.workers.dev**, paste a page address, an
 
 ## In a terminal
 
-You need [Node.js](https://nodejs.org) 22 or newer. Then, on Windows, Mac or Linux:
+Pick the way that matches your computer. Both give you the same `crawler-free` command, and neither needs an account, a key or any Cloudflare setup.
+
+**I have Node.js 22 or newer** (`node --version` shows it):
 
 ```bash
 npx crawler-free scrape https://example.com
 ```
 
-That saves the page as `./crawler-free-output/example.com.md` and prints where it went. The first time, npx asks to download the command; type `y`. To install it for good, so you can type just `crawler-free`, run `npm install --global crawler-free`.
+The first time, npx asks to download the command; type `y`. To keep it installed, so you can type just `crawler-free`, run `npm install --global crawler-free`.
+
+**I don't have Node.js:** install it with your system's package manager. It downloads the right program for your computer, checks it against the release's published checksum, puts the command on your PATH, and updates it for you. There's no unpacking or PATH editing to do yourself.
+
+| System | Install | Update | Remove |
+|---|---|---|---|
+| macOS or Linux, with [Homebrew](https://brew.sh) | `brew tap artthavv999/crawler-free https://github.com/artthavv999/crawler-free` then `brew install crawler-free` | `brew upgrade crawler-free` | `brew uninstall crawler-free` |
+| Windows, with [Scoop](https://scoop.sh) | `scoop bucket add crawler-free https://github.com/artthavv999/crawler-free` then `scoop install crawler-free` | `scoop update crawler-free` | `scoop uninstall crawler-free` |
+
+No package manager? Each [release](https://github.com/artthavv999/crawler-free/releases) also has the program to download by hand. That's for advanced users: [cli/README.md](cli/README.md#standalone-downloads-no-nodejs-needed) shows how to check a download is genuine before running it.
+
+Then, for example:
 
 ```bash
-npx crawler-free crawl https://books.toscrape.com/ --limit 20
+crawler-free scrape https://example.com
 ```
 ```bash
-npx crawler-free extract https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html --fields title,price
+crawler-free crawl https://books.toscrape.com/ --limit 20
+```
+```bash
+crawler-free extract https://books.toscrape.com/catalogue/a-light-in-the-attic_1000/index.html --fields title,price
 ```
 
-- **Results** go into `./crawler-free-output/`, named after each page's address. An existing file is never replaced without asking.
-- **If something fails,** run `npx crawler-free doctor`. It checks your setup and the connection, and says what to fix.
+(Using npx without installing? Put `npx` in front: `npx crawler-free scrape …`.)
+
+- **Results** go into `./crawler-free-output/`, named after each page's address, and the full path is printed. An existing file is never replaced without asking.
+- **If something fails,** run `crawler-free doctor`. It checks your setup and the connection, and says what to fix.
 - **More:** [cli/README.md](cli/README.md) has every command, option and exit code, and [GUIDE.md](GUIDE.md) has a beginner's walk-through. The package is [crawler-free on npm](https://www.npmjs.com/package/crawler-free).
-- **No Node.js?** Each [release](https://github.com/artthavv999/crawler-free/releases) has a standalone program for Windows, macOS and Linux with Node.js built in. [cli/README.md](cli/README.md#standalone-downloads-no-nodejs-needed) explains how to run and verify it.
-- **From this repository's code instead:** run `npm ci` and `npm run build:cli`, then use `node cli/dist/crawler-free.mjs` in place of `npx crawler-free`.
+- **Running your own copy of the service** is an advanced, separate step; see [Self-hosting](#self-hosting-cloudflare-free-0). It's never needed to use the command.
+- **From this repository's code instead:** run `npm ci` and `npm run build:cli`, then use `node cli/dist/crawler-free.mjs` in place of `crawler-free`.
 
 ## From your own code
 

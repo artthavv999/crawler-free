@@ -167,3 +167,39 @@ The 12 menu tests cover:
 **Not verified:**
 - **In a real terminal:** started with the built CLI in a Terminal panel tab, the menu appeared with the hosted-service line and its five choices. Answering in that terminal, Ctrl+C at a question, and the file manager actually opening were not tried (skipped by the owner); the tests cover them with scripted answers.
 - **Reaching users:** the changes need a CLI release (npm and standalone) before anyone gets them.
+
+## 7. Phase C result: documentation and installing (2026-10-20, not committed)
+
+**Package managers (E6)**, served from this repository, with no new repositories:
+- **Homebrew** (macOS, Linux): `brew tap artthavv999/crawler-free https://github.com/artthavv999/crawler-free`, then `brew install crawler-free`. The formula is `Formula/crawler-free.rb`. It installs the release's standalone program for the computer's system and chip, plus `LICENSE` and `NODE-LICENSE.txt`, and `brew test` checks `--version`.
+- **Scoop** (Windows): `scoop bucket add crawler-free https://github.com/artthavv999/crawler-free`, then `scoop install crawler-free`. The manifest is `bucket/crawler-free.json`.
+- **Generated, never hand-edited:** `npm run cli:manifests [version]` (`cli/manifests.mjs`) writes both files from a published release's `SHA256SUMS.txt`, and stops if any checksum differs from the digest GitHub reports for that file. It's run after each release and the result committed. For 0.1.2 it reproduces byte for byte.
+- **CI:** `.github/workflows/package-managers.yml` runs when either file changes, or by hand.
+  - **Homebrew:** it installs from the formula through a local tap on macOS (Apple silicon and Intel) and Linux x64, runs the program, runs `brew test`, checks the licence file, and uninstalls.
+  - **Scoop:** it installs Scoop with its official installer on the throwaway Windows runner, installs from the manifest, compares `--version`, and uninstalls.
+  - **Not covered:** Linux ARM64 Homebrew, because GitHub's ARM images may not include Homebrew.
+  - **Safety:** read-only permissions and no secrets.
+
+**Documentation:**
+- **README "In a terminal":**
+  - two paths, **"I have Node.js 22 or newer"** (`npx`, or `npm install --global`) and **"I don't have Node.js"** (Homebrew or Scoop, with install, update and remove commands);
+  - the hand download, marked "advanced", with a pointer to how to check it first;
+  - self-hosting labelled as a separate, never-needed step.
+- **GUIDE:** the same choices in beginner words, with "install Node.js" as the simplest fallback. Hand downloads are for advanced users, and "never switch off your computer's security protection".
+- **cli/README.md:**
+  - **Install:** Node, npm and the package managers.
+  - **Downloads:** reordered to download → **check before unpacking** → unpack → run. It explains that a checksum only proves the file matches the published list, while provenance (`gh attestation verify`) proves GitHub built it from this repository.
+  - **The warnings:** "what you may see, and why", allowing only that one checked program, never switching off SmartScreen, Gatekeeper or antivirus.
+  - **Uninstall:** per install method.
+- **No piped installer:** there's still no `curl | sh` or `irm | iex` install, and the saved-setup `irm` command only prints text.
+
+**Checks:**
+- `npm run typecheck` passed; `npm test` 44/44.
+- `npm run typecheck:cli` passed; `npm run test:cli` 91 passed, 3 skipped (CI runs them).
+- Both builds passed; `public/` is unchanged.
+- `npm audit --omit=dev` found 0 vulnerabilities; the npm package contents are unchanged (the generator isn't shipped).
+
+**Not verified yet:**
+- **The installs:** Homebrew and Scoop actually installing. The new workflow runs on the first push.
+- **Desktop warnings:** whether Scoop installs avoid Windows' "downloaded from the internet" warnings on a real desktop. Homebrew never marks command-line formulas that way. The docs only promise what's certain.
+- **Which version you get:** the package managers install 0.1.2 until the next release. The guided menu and the clearer `doctor` from Phase B arrive with that release, after which `npm run cli:manifests` must be run and committed.
